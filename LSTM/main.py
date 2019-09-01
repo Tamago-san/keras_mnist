@@ -1,10 +1,11 @@
 import keras
 from keras.datasets import mnist
 from keras.models import Sequential
-from keras.layers import Dense, Dropout
+from keras.layers import Dense, Dropout, Flatten
 from keras.optimizers import RMSprop,Adam,SGD
 from keras.layers.core import Dense, Activation
 from keras.layers.recurrent import LSTM,SimpleRNN
+from keras.layers import Conv2D, MaxPooling2D
 import numpy as np
 
 batch_size= 128
@@ -14,6 +15,12 @@ step_len=1
 standard_size=1
 train_size=1
 test_size=1
+IN_NODE=1
+OUT_NODE=10
+RC_NODE=10
+TRANING_STEP=10000
+RC_STEP=1000
+
 
 
 class data_create:
@@ -23,18 +30,42 @@ class data_create:
         self.train_size = train_size
         self.test_size = test_size
         
-    def d_3D(self,x_train,y_train,x_test,y_test):
-        x_train = x_train.reshape(x_train.shape[0], 28, 28, 1).astype('float32')/255
-        x_test = x_test.reshape(x_test.shape[0], 28, 28, 1).astype('float32')/255
+    def d_3D(self,x_train0,y_train0,x_test0,y_test0):
+        x_train0 = x_train0.reshape(x_train0.shape[0], 28, 28, 1).astype('float32')/255
+        x_test0  = x_test0.reshape(x_test0.shape[0], 28, 28, 1).astype('float32')/255
         # convert one-hot vector
-        y_train = keras.utils.to_categorical(y_train, num_classes)
-        y_test = keras.utils.to_categorical(y_test, num_classes)
+        y_train0 = keras.utils.to_categorical(y_train0, num_classes)
+        y_test0  = keras.utils.to_categorical(y_test0, num_classes)
         
-        return (x_train,y_train,x_test,y_test)
+        return (x_train0,y_train0,x_test0,y_test0)
 
     def d_2D(self,x_train0,y_train0,x_test0,y_test0):
+        print(x_train0.shape)
         x_train0 = x_train0.reshape(60000, 784,1) # 2次元配列を1次元に変換
         x_test0  = x_test0.reshape(10000, 784,1)
+        x_train0 = x_train0.astype('float32')   # int型をfloat32型に変換
+        x_test0  = x_test0.astype('float32')
+        
+        print(x_train0.shape)
+        print()
+        
+        x_train0 /= 255                        # [0-255]の値を[0.0-1.0]に変換
+        x_test0 /= 255
+        
+        
+        #x_train = x_train0[0:500,0:784,0:1]
+        #y_train = y_train0[0:500]
+        
+        # convert class vectors to binary class matrices
+        y_train0 = keras.utils.to_categorical(y_train0, num_classes)
+        y_test0  = keras.utils.to_categorical(y_test0 , num_classes)
+        
+        return (x_train0,y_train0,x_test0,y_test0)
+
+
+    def d_1D(self,x_train0,y_train0,x_test0,y_test0):
+        x_train0 = x_train0.reshape(None,1) # 2次元配列を1次元に変換
+        x_test0  = x_test0.reshape(None,1)
         x_train0 = x_train0.astype('float32')   # int型をfloat32型に変換
         x_test0  = x_test0.astype('float32')
         
@@ -61,7 +92,7 @@ class machine_construction:
         self.y_train =y_train
         self.x_test =x_test
         self.y_test =y_test
-        print(x_train.shape)
+        #print(x_train.shape)
         
         
     def evaluate(self):
@@ -70,7 +101,7 @@ class machine_construction:
         print('Test loss:', score[0])
         print('Test accuracy:', score[1])
         
-    def call_Keras_LSTM(self):
+    def call_Keras_RNN(self):
         model = Sequential()
         model.add(SimpleRNN(10, batch_input_shape=(None, 784,1), return_sequences=False))
         model.add(Dense(10))
@@ -78,6 +109,9 @@ class machine_construction:
         model.compile(loss='mean_squared_error',
               optimizer=SGD(),
               metrics=['accuracy'])
+        #model.compile(loss='categorical_crossentropy',
+        #              optimizer=RMSprop(),
+        #              metrics=['accuracy'])
         #model.summary()
         history=model.fit(self.x_train, self.y_train,
                           batch_size=1,
@@ -103,6 +137,7 @@ class machine_construction:
                             verbose=1,
                             validation_data=(self.x_test, self.y_test))
         
+    
     def call_fortran_rc_karman(_in_node,_out_node,_rc_node,_traning_step,_rc_step,
                         U_in,S_out,U_rc,S_rc,W_out):
         f = np.ctypeslib.load_library("rc_karman.so", ".")
@@ -134,10 +169,10 @@ class machine_construction:
 
 (x_train0, y_train0), (x_test0, y_test0) = mnist.load_data()
 mnist_d=data_create()
-#print(x_train0)
-(x_train,y_train,x_test,y_test)=mnist_d.d_2D=(x_train0,y_train0,x_test0,y_test0)
+#print(x_train0.shape)
+(x_train,y_train,x_test,y_test)=mnist_d.d_2D(x_train0,y_train0,x_test0,y_test0)
 
-#print(x_train)
+#print(x_train.shape)
 
 #model = Sequential()
 #model.add(Dense(512, activation='relu', input_shape=(784,)))
@@ -151,14 +186,12 @@ mnist_d=data_create()
 
 
 mc=machine_construction(x_train,y_train,x_test,y_test)
-mc.call_Keras_LSTM()
+mc.call_Keras_RNN()
+#mc.call_Keras_CNN()
 mc.evaluate()
 
-#mc.call_fortran_rc(IN_NODE,OUT_NODE,RC_NODE,TRANING_STEP,RC_STEP
-#                ,U_in[0:TRANING_STEP,0:IN_NODE],S_out[0:TRANING_STEP,0:OUT_NODE]
-#                ,U_rc[0:RC_STEP,0:IN_NODE],S_rc[0:RC_STEP,0:OUT_NODE]
-#                ,W_out))
-#
+mc.call_fortran_rc(IN_NODE,OUT_NODE,RC_NODE,TRANING_STEP,RC_STEP,W_out))
+
 
 
 #history = model.fit(x_train, y_train,
