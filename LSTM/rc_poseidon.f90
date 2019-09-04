@@ -1,6 +1,6 @@
 !-----------------------------------------------------------------------------
 !FDC
-!gfortran -shared -o rc_poseidon.so rc_poseidon.f90 -llapack
+!gfortran -shared -o rc_poseidon.so rc_poseidon.f90 -llapack -fPIC
 !-----------------------------------------------------------------------------
 module cylinder
   integer, parameter :: in_True=1
@@ -780,7 +780,7 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,traning_step00,rc_step00,&
 !【Reのdoループ 】
     do Re_tmp_int = 10,10,2
 !【TYU,TYOのdoループ 】
-    do iERR = 10,10
+    do iERR = 3,3
 !    TYU=dble(iERR)*0.1d0
     TYO=dble(iERR)*1.d0
 !    Re_tmp_int =30
@@ -854,7 +854,7 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,traning_step00,rc_step00,&
             write (filename, '("./data_RC_time_series_RE/RC_time_series_RE."i3.3 )') iRe_int
             open(45,file=filename ,status='replace')
     !        open(46,file='RC_err.dat',position='append')
-            do istep=1,RC_STEP
+            do istep=1,rc_step00
                 if (mod(istep,iout_display).eq.0) write(*,*) 'RC_step = ',istep
 !                call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
 !                        DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),istep)
@@ -873,6 +873,7 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,traning_step00,rc_step00,&
                 Vy_tmp(:,:) = Vy(:,:)
                 call CAL_RC_ERR(RCerr)
             enddo
+            close(45)
     enddo
     enddo
 !    s_rc(:,:)=S_rc(:,:)/s_rc(1,1)
