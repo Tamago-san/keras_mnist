@@ -7,6 +7,7 @@ from keras.layers.core import Dense, Activation
 from keras.layers.recurrent import LSTM,SimpleRNN
 from keras.layers import Conv2D, MaxPooling2D
 import numpy as np
+import ctypes
 
 batch_size= 128
 num_classes = 10
@@ -15,12 +16,12 @@ step_len=1
 standard_size=1
 train_size=1
 test_size=1
-IN_NODE=1
-OUT_NODE=10
-RC_NODE=10
-TRANING_STEP=10000
-RC_STEP=1000
-
+in_node=1
+out_node=10
+rc_node=10
+traning_step=10000
+rc_step=1000
+W_out = np.empty((rc_node,rc_node))
 
 
 class data_create:
@@ -29,10 +30,23 @@ class data_create:
         self.standard_size =standard_size
         self.train_size = train_size
         self.test_size = test_size
+    
+    def to_categorical_1D(self,y_f, num_classes):
+        y_tmp = []
+        for inum in y_f
+            for i  in range(0,num_classes):
+                if inum == i:
+                    y_tmp = 1
+                    else :
+                        y_tmp = 0
+            for i in range(0,784):
+                y_tmp = y_tmp
+        
+        return y_tmp,astype(float 64)
         
     def d_3D(self,x_train0,y_train0,x_test0,y_test0):
-        x_train0 = x_train0.reshape(x_train0.shape[0], 28, 28, 1).astype('float32')/255
-        x_test0  = x_test0.reshape(x_test0.shape[0], 28, 28, 1).astype('float32')/255
+        x_train0 = x_train0.reshape(x_train0.shape[0], 28, 28, 1).astype('float64')/255
+        x_test0  = x_test0.reshape(x_test0.shape[0], 28, 28, 1).astype('float64')/255
         # convert one-hot vector
         y_train0 = keras.utils.to_categorical(y_train0, num_classes)
         y_test0  = keras.utils.to_categorical(y_test0, num_classes)
@@ -43,8 +57,8 @@ class data_create:
         print(x_train0.shape)
         x_train0 = x_train0.reshape(60000, 784,1) # 2次元配列を1次元に変換
         x_test0  = x_test0.reshape(10000, 784,1)
-        x_train0 = x_train0.astype('float32')   # int型をfloat32型に変換
-        x_test0  = x_test0.astype('float32')
+        x_train0 = x_train0.astype('float64')   # int型をfloat64型に変換
+        x_test0  = x_test0.astype('float64')
         
         print(x_train0.shape)
         print()
@@ -64,10 +78,10 @@ class data_create:
 
 
     def d_1D(self,x_train0,y_train0,x_test0,y_test0):
-        x_train0 = x_train0.reshape(None,1) # 2次元配列を1次元に変換
-        x_test0  = x_test0.reshape(None,1)
-        x_train0 = x_train0.astype('float32')   # int型をfloat32型に変換
-        x_test0  = x_test0.astype('float32')
+        x_train0 = x_train0.reshape(-1) # 2次元配列を1次元に変換
+        x_test0  = x_test0.reshape(-1)
+        x_train0 = x_train0.astype('float64')   # int型をfloat64型に変換
+        x_test0  = x_test0.astype('float64')
         
         print(x_train0.shape)
         
@@ -79,8 +93,12 @@ class data_create:
         #y_train = y_train0[0:500]
         
         # convert class vectors to binary class matrices
-        y_train0 = keras.utils.to_categorical(y_train0, num_classes)
-        y_test0  = keras.utils.to_categorical(y_test0 , num_classes)
+        #y_train0 = keras.utils.to_categorical(y_train0, num_classes)
+        #y_test0  = keras.utils.to_categorical(y_test0 , num_classes)
+        y_train0 = to_categorical_1D(y_train0, num_classes)
+        y_test0  = to_categorical_1D(y_test0, num_classes)
+        
+        
         
     
         return (x_train0,y_train0,x_test0,y_test0)
@@ -138,10 +156,17 @@ class machine_construction:
                             validation_data=(self.x_test, self.y_test))
         
     
-    def call_fortran_rc_karman(_in_node,_out_node,_rc_node,_traning_step,_rc_step,
-                        U_in,S_out,U_rc,S_rc,W_out):
-        f = np.ctypeslib.load_library("rc_karman.so", ".")
-        f. rc_traning_own_karman_.argtypes = [
+    def call_fortran_rc(self,in_node,_out_node,_rc_node,_traning_step,_rc_step):
+        
+        self.x_train=self.x_train.T.copy()
+        self.x_test =self.x_test .T.copy()
+        self.y_train=self.y_train.T.copy().astype('float64')
+        self.y_test =self.y_test .T.copy().astype('float64')
+        W_out [...]=W_out.T.copy().astype('float64')
+
+        
+        f = np.ctypeslib.load_library("rc_poseidon.so", ".")
+        f.rc_poseidon_.argtypes = [
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
@@ -153,16 +178,16 @@ class machine_construction:
             np.ctypeslib.ndpointer(dtype=np.float64),
             np.ctypeslib.ndpointer(dtype=np.float64),
             ]
-        f. rc_traning_own_karman_.restype = ctypes.c_void_p
+        f.rc_poseidon_.restype = ctypes.c_void_p
     
-        f_in_node = ctypes.byref(ctypes.c_int32(_in_node))
-        f_out_node = ctypes.byref(ctypes.c_int32(_out_node))
-        f_rc_node = ctypes.byref(ctypes.c_int32(_rc_node))
-        f_traning_step = ctypes.byref(ctypes.c_int32(_traning_step))
-        f_rc_step = ctypes.byref(ctypes.c_int32(_rc_step))
+        f_in_node = ctypes.byref(ctypes.c_int32(in_node))
+        f_out_node = ctypes.byref(ctypes.c_int32(out_node))
+        f_rc_node = ctypes.byref(ctypes.c_int32(rc_node))
+        f_traning_step = ctypes.byref(ctypes.c_int32(traning_step))
+        f_rc_step = ctypes.byref(ctypes.c_int32(rc_step))
     
-        f.rc_traning_own_karman_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
-                                U_in,S_out,U_rc,S_rc,W_out)
+        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
+                        self.x_train,self.y_train,self.x_test,self.y_test,W_out)
         
 
 
@@ -170,7 +195,7 @@ class machine_construction:
 (x_train0, y_train0), (x_test0, y_test0) = mnist.load_data()
 mnist_d=data_create()
 #print(x_train0.shape)
-(x_train,y_train,x_test,y_test)=mnist_d.d_2D(x_train0,y_train0,x_test0,y_test0)
+(x_train,y_train,x_test,y_test)=mnist_d.d_1D(x_train0,y_train0,x_test0,y_test0)
 
 #print(x_train.shape)
 
@@ -186,11 +211,13 @@ mnist_d=data_create()
 
 
 mc=machine_construction(x_train,y_train,x_test,y_test)
-mc.call_Keras_RNN()
+#mc.call_Keras_RNN()
 #mc.call_Keras_CNN()
-mc.evaluate()
+#mc.evaluate()
 
-mc.call_fortran_rc(IN_NODE,OUT_NODE,RC_NODE,TRANING_STEP,RC_STEP,W_out))
+
+
+mc.call_fortran_rc(in_node,out_node,rc_node,traning_step,rc_step)
 
 
 

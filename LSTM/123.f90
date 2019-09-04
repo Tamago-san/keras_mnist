@@ -7,20 +7,20 @@
 !-----------------------------------------------------------------------------
 module cylinder
   integer, parameter :: in_True=1
-  integer, parameter :: NOW = 0
-  integer, parameter :: BEFORE  = -1
-  integer :: Future1 = 10 !0.1
-  integer :: Future2 = 30 !0.3
-  integer :: Future3 = 50 !0.5
-  real(8),parameter  :: Fu1_dble =0.1
-  real(8),parameter  :: Fu2_dble =0.3
-  real(8),parameter  :: Fu3_dble =0.5
-  integer, parameter :: OUT_NODE = 5
+!  integer, parameter :: NOW = 0
+!  integer, parameter :: BEFORE  = -1
+!  integer :: Future1 = 10 !0.1
+!  integer :: Future2 = 30 !0.3
+!  integer :: Future3 = 50 !0.5
+!  real(8),parameter  :: Fu1_dble =0.1
+!  real(8),parameter  :: Fu2_dble =0.3
+!  real(8),parameter  :: Fu3_dble =0.5
+  integer, parameter :: OUT_NODE = 10
   integer, parameter :: IN_NODE = 1
-  integer, parameter :: TRANING_TIME_L =  5000 !5000time
-  integer, parameter :: RC_TIME_L = 100        !100time
-  integer ::  TRANING_STEP = TRANING_TIME_L
-  integer ::  RC_STEP = RC_TIME_L    !インプットの信号を入れるか入れないか。
+!  integer, parameter :: TRANING_TIME_L =  5000 !5000time
+!  integer, parameter :: RC_TIME_L = 100        !100time
+!  integer ::  TRANING_STEP = TRANING_TIME_L
+!  integer ::  RC_STEP = RC_TIME_L    !インプットの信号を入れるか入れないか。
   real(kind=8) :: TYU =0.d0 !信号の平行移動(1なら中心１)
   real(kind=8) :: TYO =1.2d0 !信号の大きさ（１なら大きさ１）
   real(kind=8) :: TYK =5.d0 !5なら信号の大きさ1に（5をデフォルトとする）（-0.5～+0.5）
@@ -53,8 +53,8 @@ module cylinder
   character(6) :: Re_tmp_name
  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  !-------------------------------------------------------
-	integer,parameter :: tate_y = 20
-	integer,parameter :: yoko_x = 40
+	integer,parameter :: tate_y  = 20
+	integer,parameter :: yoko_x  = 40
 	integer,parameter :: Rvx_min = -10
 	integer,parameter :: Rvx_max = +30
 	integer,parameter :: Rvy_min = -10
