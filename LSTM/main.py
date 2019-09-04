@@ -21,7 +21,7 @@ out_node=10
 rc_node=10
 traning_step=10000
 rc_step=1000
-W_out = np.empty((rc_node,rc_node))
+Wout = np.empty((rc_node,out_node))
 
 
 class data_create:
@@ -83,7 +83,7 @@ class data_create:
 
 
     def d_1D(self,x_train0,y_train0,x_test0,y_test0):
-        x_train0 = x_train0[:100,:].reshape(-1) # 2次元配列を1次元に変換
+        x_train0 = x_train0[:1000,:].reshape(-1) # 2次元配列を1次元に変換
         x_test0  = x_test0[:250].reshape(-1)
         x_train0 = x_train0.astype('float64')   # int型をfloat64型に変換
         x_test0  = x_test0.astype('float64')
@@ -100,7 +100,7 @@ class data_create:
         # convert class vectors to binary class matrices
         #y_train0 = keras.utils.to_categorical(y_train0, num_classes)
         #y_test0  = keras.utils.to_categorical(y_test0 , num_classes)
-        y_train0 = self.to_categorical_1D(y_train0[:100], num_classes)
+        y_train0 = self.to_categorical_1D(y_train0[:1000], num_classes)
         y_test0  = self.to_categorical_1D(y_test0[:250], num_classes)
         print(y_train0)
         return (x_train0,y_train0,x_test0,y_test0)
@@ -109,11 +109,12 @@ class data_create:
 
 class machine_construction:
     
-    def __init__(self,x_train,y_train,x_test,y_test):
+    def __init__(self,x_train,y_train,x_test,y_test,Wout):
         self.x_train =x_train
         self.y_train =y_train
         self.x_test =x_test
         self.y_test =y_test
+        self.Wout = Wout
         #print(x_train.shape)
         
         
@@ -166,7 +167,7 @@ class machine_construction:
         self.x_test =self.x_test .T.copy()
         self.y_train=self.y_train.T.copy().astype('float64')
         self.y_test =self.y_test .T.copy().astype('float64')
-        W_out [...]=W_out.T.copy().astype('float64')
+        self.Wout = Wout.T.copy().astype('float64')
 
         
         f = np.ctypeslib.load_library("rc_poseidon.so", ".")
@@ -184,14 +185,14 @@ class machine_construction:
             ]
         f.rc_poseidon_.restype = ctypes.c_void_p
     
-        f_in_node = ctypes.byref(ctypes.c_int32(in_node))
-        f_out_node = ctypes.byref(ctypes.c_int32(out_node))
-        f_rc_node = ctypes.byref(ctypes.c_int32(rc_node))
-        f_traning_step = ctypes.byref(ctypes.c_int32(traning_step))
-        f_rc_step = ctypes.byref(ctypes.c_int32(rc_step))
+        f_in_node = ctypes.byref(ctypes.c_int32(_in_node))
+        f_out_node = ctypes.byref(ctypes.c_int32(_out_node))
+        f_rc_node = ctypes.byref(ctypes.c_int32(_rc_node))
+        f_traning_step = ctypes.byref(ctypes.c_int32(_traning_step))
+        f_rc_step = ctypes.byref(ctypes.c_int32(_rc_step))
     
         f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
-                        self.x_train,self.y_train,self.x_test,self.y_test,W_out)
+                        self.x_train,self.y_train,self.x_test,self.y_test,Wout)
         
         
         
@@ -216,7 +217,7 @@ mnist_d=data_create()
 
 
 
-mc=machine_construction(x_train,y_train,x_test,y_test)
+mc=machine_construction(x_train,y_train,x_test,y_test,Wout)
 #mc.call_Keras_RNN()
 #mc.call_Keras_CNN()
 #mc.evaluate()

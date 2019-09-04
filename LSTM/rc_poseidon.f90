@@ -851,7 +851,7 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,traning_step00,rc_step00,&
             write(*,*) "     RC STEP"
             write(*,*) "=========================================="
             
-            write (filename, '("./data_RC_time_series_RE/dt", i5.5,"/RC_time_series_RE."i3.3 )') idtldtN,iRe_int
+            write (filename, '("./data_RC_time_series_RE/RC_time_series_RE."i3.3 )') iRe_int
             open(45,file=filename ,status='replace')
     !        open(46,file='RC_err.dat',position='append')
             do istep=1,RC_STEP
