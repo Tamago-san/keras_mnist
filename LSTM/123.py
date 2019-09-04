@@ -1,6 +1,9 @@
 !-----------------------------------------------------------------------------
-!FDC
-!gfortran -shared -o rc_poseidon.so rc_poseidon.f90 -llapack
+!
+!do文でRe数移動。リアプノフ指数計算。コサイン計算。
+!k7_ver1との違い
+!エラー計算
+!gfortran main.f90 -o main.out -llapack -lblas
 !-----------------------------------------------------------------------------
 module cylinder
   integer, parameter :: in_True=1
@@ -12,7 +15,7 @@ module cylinder
   real(8),parameter  :: Fu1_dble =0.1
   real(8),parameter  :: Fu2_dble =0.3
   real(8),parameter  :: Fu3_dble =0.5
-  integer, parameter :: OUT_NODE = 10
+  integer, parameter :: OUT_NODE = 5
   integer, parameter :: IN_NODE = 1
   integer, parameter :: TRANING_TIME_L =  5000 !5000time
   integer, parameter :: RC_TIME_L = 100        !100time
@@ -30,7 +33,7 @@ module cylinder
   real(kind=8), parameter :: dt=0.01d0              ! 時間刻み
   integer(kind=4), parameter :: Nstep=200000         ! LYトータルステップ数
   integer(kind=4), parameter :: iout=100           ! 出力間隔
-  integer(kind=4), parameter :: iout_display=100  ! コンパイル画面の出力間隔
+  integer(kind=4), parameter :: iout_display=5000  ! コンパイル画面の出力間隔
   integer(kind=4), parameter :: iSep=2              ! 出力データの間引き
   real(kind=8) :: Xmin,dX
   real(kind=8) :: Ymax,Ymin
@@ -38,7 +41,7 @@ module cylinder
   integer(kind=4) :: iY1(NXmin:NXmax),iY2(NXmin:NXmax)
   integer(kind=4) :: iXb1,iXb2
   integer(kind=4) :: istep,idtldtN,iRe_int
-  integer(kind=4), parameter :: Ly_skip_step = 20000 !撹乱が定常、周期まで25000ステップ（250タイム）
+  integer(kind=4), parameter :: Ly_skip_step = 200 !撹乱が定常、周期まで25000ステップ（250タイム）
   integer(kind=4), parameter :: skip_step = 20000 !定常，周期まで(200time)
   integer(kind=4), parameter :: Ly_out = 100 !リアプノフ指数の測定ステップ数500ステップ
   real(kind=8) :: abs_dV0
@@ -50,8 +53,8 @@ module cylinder
   character(6) :: Re_tmp_name
  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  !-------------------------------------------------------
-	integer,parameter :: tate_y  = 20
-	integer,parameter :: yoko_x  = 40
+	integer,parameter :: tate_y = 20
+	integer,parameter :: yoko_x = 40
 	integer,parameter :: Rvx_min = -10
 	integer,parameter :: Rvx_max = +30
 	integer,parameter :: Rvy_min = -10
@@ -421,13 +424,7 @@ module cylinder
 			    !U_tr(:,1)= ( U_tr(:,1)/TYK )*TYO +TYU
                 !S_tr(:,1)= ( S_tr(:,1)/TYK )*TYO +TYU
                 !S_tr(:,2)= ( S_tr(:,2)/TYK )*TYO +TYU
-            case(1)
-				U_data(1,1)=(U_data(1,1)-DATA_mean(1))/DATA_var(1)
-				S_data(1,1)=(S_data(1,1)-DATA_mean(2))/DATA_var(2)
-				S_data(1,2)=(S_data(1,2)-DATA_mean(3))/DATA_var(3)
-				S_data(1,3)=(S_data(1,3)-DATA_mean(1))/DATA_var(1)
-				S_data(1,4)=(S_data(1,4)-DATA_mean(1))/DATA_var(1)
-				S_data(1,5)=(S_data(1,5)-DATA_mean(1))/DATA_var(1)
+    
 		    case(2)
 				U_data(1,1)=(U_data(1,1)-DATA_mean(1))/DATA_var(1)
 				S_data(1,1)=(S_data(1,1)-DATA_mean(2))/DATA_var(2)
@@ -583,12 +580,12 @@ function mean(a,time) result(out)
         DATA(Future3,2) =y0
         DATA(Future3,3) =z0
         do i=1,10000
-!            call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
-!                    DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),i)
+            call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
+                    DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),i)
         enddo
         do i=1,mean_var_step
-!            call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
-!                    DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),i)
+            call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
+                    DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),i)
             DATA_tmp(i,1) = DATA(NOW,1)
             DATA_tmp(i,2) = DATA(NOW,2)
             DATA_tmp(i,3) = DATA(NOW,3)
@@ -636,7 +633,7 @@ function mean(a,time) result(out)
         
         !filename = a
         inode=1
-        write (filename, '("./data_Wout/Wout_RE."i3.3 )') iRe_int
+        write (filename, '("./data_Wout/dt", i5.5,"/Wout_RE."i3.3 )') idtldtN,iRe_int
         open(42,file=filename,status='replace')
         do iX=Rvx_min,Rvx_max
         do iY=Rvy_min,Rvy_max
@@ -683,7 +680,7 @@ function mean(a,time) result(out)
                 if(abs(RiSj(i,j))<1.d-5) RiSj(i,j)=0.d0
 	    enddo
 	    enddo
-	    write (filename, '("./data_traning_rirj/rirj_RE."i3.3 )') iRe_int
+	    write (filename, '("./data_traning_rirj/dt", i5.5,"/rirj_RE."i3.3 )') idtldtN,iRe_int
 	    if(step==1) open(42,file=filename ,status='replace')
 	    if(step/=1) open(42,file=filename ,position='append')
 !        rirj=rirj +  r_tmp(i,100)*r_tmp(i,10)
@@ -694,147 +691,206 @@ function mean(a,time) result(out)
 !-----------------------------------------------------------------------------
 !■ルンゲクッタ法での近似
 !-----------------------------------------------------------------------------
+	subroutine Runge_Kutta_method(r_now,x_be,y_be,z_be,step)
+		real(8) x,y,z
+		real(8) x_be,y_be,z_be
+		real(8) r_now(BEFORE:Future3,1:3)
+		real(8) k1(1:3),k2(1:3),k3(1:3),k4(1:3)
+		real(8) k(1:3)
+		integer i,j,step
+		
+		x=x_be
+		y=y_be
+		z=z_be
+        do j=1, int(dt_l/dt_Runge)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		    k1(1)=f1(x,y,z)
+		    k1(2)=f2(x,y,z)
+		    k1(3)=f3(x,y,z)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		    k2(1)=f1(x+k1(1)*0.5d0 ,y+k1(2)*0.5d0 , z+k1(3)*0.5d0)
+		    k2(2)=f2(x+k1(1)*0.5d0, y+k1(2)*0.5d0 , z+k1(3)*0.5d0)
+		    k2(3)=f3(x+k1(1)*0.5d0, y+k1(2)*0.5d0 , z+k1(3)*0.5d0)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		    k3(1)=f1(x+k2(1)*0.5d0, y+k2(2)*0.5d0 , z+k2(3)*0.5d0)
+		    k3(2)=f2(x+k2(1)*0.5d0, y+k2(2)*0.5d0 , z+k2(3)*0.5d0)
+		    k3(3)=f3(x+k2(1)*0.5d0, y+k2(2)*0.5d0 , z+k2(3)*0.5d0)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		    k4(1)=f1(x+k3(1), y+k3(2) , z+k3(3))
+		    k4(2)=f2(x+k3(1), y+k3(2) , z+k3(3))
+		    k4(3)=f3(x+k3(1), y+k3(2) , z+k3(3))
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+		    do i=1,3
+		    	k(i)=( k1(i) + 2.d0*k2(i) + 2.d0*k3(i) + k4(i) )/6.d0
+		    enddo
+		    x = x+k(1)
+		    y = y+k(2)
+		    z = z+k(3)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        enddo
+        do j=NOW,Future3
+            r_now(j-1,1:3) = r_now(j,1:3)
+        enddo
+		r_now(Future3,1) = x
+		r_now(Future3,2) = y
+		r_now(Future3,3) = z
+!        open(20,file='output_001_Euler_x2y10z5.dat',position='append')
+!        write(20,*) step ,r_now(1,1:3)
+!        close(20)
+    contains
+        function f1(x,y,z)
+	    	real(8) x,y,z
+	    	real(8) f1
+	    	f1=dt_Runge*(-par_a*(x-y))
+	    end function f1
+	    function f2(x,y,z)
+	    	real(8) x,y,z
+	    	real(8) f2
+	    	f2=dt_Runge*((par_b-z)*x - y)
+	    end function f2
+	    function f3(x,y,z)
+	    	real(8) x,y,z
+	    	real(8) f3
+	    	f3=dt_Runge*(x*y -par_c*z)
+	    end function f3
+	end subroutine Runge_Kutta_method
 !-----------------------------------------------------------------------------
 end module cylinder
 !-----------------------------------------------------------------------------
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine rc_poseidon(in_node00,out_node00,rc_node00,traning_step00,rc_step00,&
-                    u_tr,s_tr,u_rc,s_rc_data,w_out0)
+program main
   use cylinder
-    implicit none
-    integer(4), intent(inout) :: in_node00,out_node00,rc_node00,traning_step00,rc_step00
-    real(8),    intent(inout) :: w_out0(rc_node00,out_node00)
-    real(8),    intent(inout) ::u_tr(traning_step00,in_node00) !今は一次元、列サイズはトレーニング時間
-    real(8),    intent(inout) ::s_tr(traning_step00,out_node00)  !出力次元数、列サイズはトレーニング時間
-    real(8),    intent(inout) ::u_rc(rc_step00,in_node00) !今は一次元、列サイズはトレーニング時間
-    real(8),    intent(inout) ::s_rc_data(rc_step00,out_node00)  !出力次元数、列サイズはトレーニング時間
-    real(kind=8) :: R_tr(traning_step00,rc_node00)
-!    real(kind=8) :: W_out(rc_node00,out_node00)
-!    real(kind=8) :: U_tr (traning_step00,in_node00)
-!    real(kind=8) :: S_tr (traning_step00,out_node00)
- !   real(kind=8) :: U_rc (rc_step00,in_node00)
- !   real(kind=8) :: S_rc (rc_step00,out_node00)
- !   real(kind=8) :: S_rc_data(rc_step00,out_node00)
-    real(kind=8) :: Vx(NXmin:NXmax,NYmin:NYmax)
-    real(kind=8) :: Vy(NXmin:NXmax,NYmin:NYmax)
-    real(kind=8) :: P (NXmin:NXmax,NYmin:NYmax)
-    real(kind=8) :: RCerr(1:OUT_NODE)
-    real(kind=8) RiRj(RC_NODE,RC_NODE)
-    real(kind=8) RiSj(RC_NODE,OUT_NODE)
-    integer iX,iY,i,j
-    integer Re_tmp_int,iERR
-    character filename*128
-
+  implicit none
+  include 'mpif.h'
+  integer myrank
+  integer procs !並列数
+  integer ierr  !エラーコード
+ 
+  real(kind=8) RiRj(RC_NODE,RC_NODE)
+  real(kind=8) RiSj(RC_NODE,OUT_NODE)
+  real(kind=8) :: Vx(NXmin:NXmax,NYmin:NYmax)
+  real(kind=8) :: Vy(NXmin:NXmax,NYmin:NYmax)
+  real(kind=8) :: P (NXmin:NXmax,NYmin:NYmax)
+  real(kind=8) :: RCerr(1:OUT_NODE)
+  integer iX,iY
+  character filename*128
+  integer iTYO,j
 !=================================================================================================================
 !-----------------------------------------------------------------------------------------------------------------
 !初期化
-        !write (filename,'mkdir -p ./data')
-        !call system( filename )
 !    open(82,file='./data_lyap_end/lyapnov_end.dat',status='replace')
 !    close(82)
-!    open(46,file='RC_err.dat',status='replace')
-!    close(46)
-!    OUT_NODE = out_node00
-!    IN_NODE = in_node00
-!    TRANING_STEP =traning_step00
-!    RC_STEP = rc_step
-!    call allocate_mat(in_node00,out_node00,rc_node00,traning_step00,rc_step00)
-!    do idtldtN=8,2,-2
-!        write (filename, '("mkdir -p ./data_Wout/dt", i5.5)') idtldtN
-!        call system( filename )
-!        write (filename, '("mkdir -p ./data_traning_rirj/dt", i5.5)') idtldtN
-!        call system( filename )
-!        write (filename, '("mkdir -p ./data_RC_time_series_RE/dt", i5.5)') idtldtN
-!        call system( filename )
-!    enddo
-!    do idtldtN=8,2,-2
-!        write (filename, '("./data_err/RCerr_dt."i5.5 )') idtldtN
-!        open (46, file=filename, status='replace')
-!        close(46)
-!    enddo
-!----------------------------------------------------------------------------------------------------------------
+ !   write (filename, '("mydata", i3.3, ".txt")') i ! ここでファイル名を生成している
+!    print *, trim(filename)
+    j=2
+    do idtldtN=8,2,-2
+        write (filename, '("mkdir -p ./data_Wout/dt", i5.5)') idtldtN
+        call system( filename )
+        write (filename, '("mkdir -p ./data_traning_rirj/dt", i5.5)') idtldtN
+        call system( filename )
+        write (filename, '("mkdir -p ./data_RC_time_series_RE/dt", i5.5)') idtldtN
+        call system( filename )
+    enddo
+    do idtldtN=8,2,-2
+        write (filename, '("./data_err/RCerr_dt."i5.5 )') idtldtN
+        open (46, file=filename, status='replace')
+        close(46)
+    enddo
+    RiRj=0.d0
+    RiSj=0.d0
 !=================================================================================================================
+  call MPI_Init(ierr)
+  call MPI_Comm_size(MPI_COMM_WORLD, procs, ierr)
+  call MPI_Comm_rank(MPI_COMM_WORLD, myrank, ierr)
+  call set_grid
+  
+ 
+    do idtldtN=8,2,-2
+    !if(mod(idtldtN,procs)==myrank) then
     
-
-    !OUT_NODE = out_node00
-    !IN_NODE = in_node00
-    !TRANING_STEP = traning_step00
-    !RC_STEP = rc_step00
+        dt_l=dble(idtldtN)*dt*0.01d0
+        Future1 = nint(Fu1_dble/dt_l)
+        Future2 = nint(Fu2_dble/dt_l)
+        Future3 = nint(Fu3_dble/dt_l)
+        TRANING_STEP = nint(TRANING_TIME_L/dt_l)
+        RC_STEP = nint(RC_TIME_L/dt_l)
+    !【Reのdoループ 】
+        do iRe_int = 0,19,1
+        if(mod(iRe_int,procs)==myrank) then
+    !【TYU,TYOのdoループ 】
+        do iTYO = 5,5
+    !    TYU=dble(iTYO)*0.1d0
+        TYO=dble(iTYO)*1.d0
+    !    iRe_int =30
+            W_out=0.d0
+            RiRj=0.d0
+            RiSj=0.d0
+            Re_tmp_dble =dble(iRe_int)
+            write(Re_tmp_name,'(i3.3)') iRe_int
+            RCerr=0.d0
+            call initial_condition(Vx,Vy,P)
+    !  call output_V_P(Vx,Vy,P,0)
+            
+            write(*,*) ""
+            write(*,*) "============================================= "
+            write(*,*) "START >>  Re ==" ,Re_tmp_dble
+            write(*,*) "START >>  TYO ==" ,TYO
+            write(*,*) "============================================= "
     
-    write(*,*) "+++++++++++++++++++++++++++++++"
-    write(*,*) "==============================="
-    write(*,*) "    welcome to  Fortran90 !    "
-    write(*,*) "-------------------------------"
-    WRITE(*,*) "IN_NODE      ",in_node00
-    WRITE(*,*) "OUT_NODE     ",out_node00
-    WRITE(*,*) "RC_NODE      ",rc_node
-    WRITE(*,*) "TRANING_STEP ",traning_step00
-    WRITE(*,*) "RC_STEP      ",rc_step00
-    write(*,*) "-------------------------------"
-    write(*,*) "==============================="
-    write(*,*) "+++++++++++++++++++++++++++++++"
-    write(*,*) ""
-!=================================================================================================================
-    call set_grid
     
-!【Reのdoループ 】
-    do Re_tmp_int = 10,10,2
-!【TYU,TYOのdoループ 】
-    do iERR = 10,10
-!    TYU=dble(iERR)*0.1d0
-    TYO=dble(iERR)*1.d0
-!    Re_tmp_int =30
     
-        Re_tmp_dble =dble(Re_tmp_int)
-        RCerr=0.d0
-
-        call initial_condition(Vx,Vy,P)
-!  call output_V_P(Vx,Vy,P,0)
-        write(Re_tmp_name,'(i3.3)') Re_tmp_int
-        write(*,*) ""
-        write(*,*) "============================================= "
-        write(*,*) "START >>  Re ==" ,Re_tmp_dble
-        write(*,*) "START >>  TYO ==" ,TYO
-        write(*,*) "============================================= "
-
-
-
-!流れが定常or周期状態になるまでスキップ
-        write(*,*) "=========================================="
-        write(*,*) "     SKIP STEP"
-        write(*,*) "=========================================="
-        do istep=1,skip_step
+    !流れが定常or周期状態になるまでスキップ
+            write(*,*) "=========================================="
+            write(*,*) "     SKIP STEP"
+            write(*,*) "=========================================="
+            !open(32,file='./data_skip_step_OK_RE/skip_step_OK_RE.'//Re_tmp_name,status='replace')
+            do istep=1,skip_step
     !=================================================================================================================
     !-----------------------------------------------------------------------------------------------------------------
     !ディスプレイ表示(一つ前のステップの値が出力istep=10ならistep=9の値)
     !-----------------------------------------------------------------------------------------------------------------
-            if (mod(istep,5000).eq.0) write(*,*) 'Skip_step = ',istep
-            if (mod(istep,5000).eq.0) write(*,*) '    Re    = ',iRe_int
-            if (mod(istep,5000).eq.0) write(*,*) '    U     = ',U_tmp
-            if (mod(istep,5000).eq.0) write(*,*) "   TYO    = " ,TYO
-            if (mod(istep,5000).eq.0) write(*,200) '-------------    Vx(NXmax/2,0)=',Vx(NXmax/2,0)
-            call march(Vx,Vy,P,0)
-            !write(32,*) dt*real(istep),Vx(NXmax/2,0)
-        enddo
-  
-!        Vx_tmp(:,:) = Vx(:,:)
-!        Vy_tmp(:,:) = Vy(:,:)
-
-
-        write(*,*) "=========================================="
-        write(*,*) "     TRANING STEP"
-        write(*,*) "=========================================="
+                if (mod(istep,iout_display).eq.0) write(*,*) 'Skip_step = ',istep
+                if (mod(istep,iout_display).eq.0) write(*,*) '    Re    = ',iRe_int
+                if (mod(istep,iout_display).eq.0) write(*,*) '    U     = ',U_tmp
+                if (mod(istep,iout_display).eq.0) write(*,*) "   TYO    = " ,TYO
+                if (mod(istep,iout_display).eq.0) write(*,200) '-------------    Vx(NXmax/2,0)=',Vx(NXmax/2,0)
+                call march(Vx,Vy,P,0)
+                !write(32,*) dt*real(istep),Vx(NXmax/2,0)
+            enddo
+           !close(32)
+      
+            Vx_tmp(:,:) = Vx(:,:)
+            Vy_tmp(:,:) = Vy(:,:)
+    
+    
+            write(*,*) "=========================================="
+            write(*,*) "     TRANING STEP"
+            write(*,*) "=========================================="
+    !        open(40,file='./data_TRANING_time_series_RE/TRANING_time_series_RE.'//Re_tmp_name,status='replace')
+            call CREATE_TRANING_DATA
+            write(*,*) "=========================================="
+            write(*,*) "     TRANING DATA OK"
+            write(*,*) "=========================================="
+    !        do i =1,1000
+    !            write(40,*) i,U_tr(i,1),S_tr(i,1),S_tr(i,2)
+    !        enddo
+    !        close(40)
             do istep=1,TRANING_STEP
                 if (mod(istep,iout_display).eq.0) write(*,*) 'TRANING_step = ',istep
                 if (mod(istep,iout_display).eq.0) write(*,*) '    Re    = ',iRe_int
                 if (mod(istep,iout_display).eq.0) write(*,*) '    U     = ',U_tmp
                 if (mod(istep,iout_display).eq.0) write(*,*) "   TYO    = " ,TYO
                 if (mod(istep,iout_display).eq.0) write(*,200) '-------------    Vx(NXmax/2,0)=',Vx(NXmax/2,0)
-                U_data(1,1) = u_tr(istep,1)
-                do i=1,10
-                    S_data(1,i) = s_tr(istep,i)
-                enddo
-                !call DATA_standard(2)
+                call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
+                        DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),istep)
+                U_data(1,1) = DATA(NOW,1)
+                S_data(1,1) = DATA(NOW,2)
+                S_data(1,2) = DATA(NOW,3)
+                S_data(1,3) = DATA(Future1,1)
+                S_data(1,4) = DATA(Future2,1)
+                S_data(1,5) = DATA(Future3,1)
+                call DATA_standard(2)
                 call march(Vx,Vy,P,1)
                 call mean_rirj(Vx,Vy,RiRj,RiSj,istep)
                 Vx_tmp(:,:) = Vx(:,:)
@@ -846,6 +902,7 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,traning_step00,rc_step00,&
     !        write(*,*) RiRj
             call create_Wout_matrix(RiRj,RiSj)
             call output_Wout
+            
     !=================================================================================================================%%
             write(*,*) "=========================================="
             write(*,*) "     RC STEP"
@@ -856,13 +913,15 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,traning_step00,rc_step00,&
     !        open(46,file='RC_err.dat',position='append')
             do istep=1,RC_STEP
                 if (mod(istep,iout_display).eq.0) write(*,*) 'RC_step = ',istep
-!                call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
-!                        DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),istep)
-                U_data(1,1) = u_tr(istep,1)
-                do i=1,10
-                    S_data(1,i) = s_tr(istep,i)
-                enddo
-!                call DATA_standard(2)
+                call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
+                        DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),istep)
+                U_data(1,1) = DATA(NOW,1)
+                S_data(1,1) = DATA(NOW,2)
+                S_data(1,2) = DATA(NOW,3)
+                S_data(1,3) = DATA(Future1,1)
+                S_data(1,4) = DATA(Future2,1)
+                S_data(1,5) = DATA(Future3,1)
+                call DATA_standard(2)
                 call march(Vx,Vy,P,2)
                 call RC_OWN(Vx,Vy,istep)
                 if(istep<=int(30.d0/dt_l) ) then
@@ -873,23 +932,35 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,traning_step00,rc_step00,&
                 Vy_tmp(:,:) = Vy(:,:)
                 call CAL_RC_ERR(RCerr)
             enddo
-    enddo
-    enddo
-!    s_rc(:,:)=S_rc(:,:)/s_rc(1,1)
+    !    RCerr= ( ( RCerr/(dble(RC_STEP*OUT_NODE)) )**0.5d0)/TYO
+        RCerr(1:OUT_NODE)= ( ( RCerr(1:OUT_NODE)/(dble(RC_STEP)) )**0.5d0)
+    !   write(46,*) iRe_int,RCerr
+    !   write(46,*) TYU,RCerr
+        write (filename, '("./data_err/RCerr_dt."i5.5 )') idtldtN
+        open(47,file=filename ,position='append')
+        write(47,"(6e14.6)") Re_tmp_dble,RCerr(1:OUT_NODE)
+        write(*,*) "RC ERR",RCerr
+    !    write(*,"(5e14.6)") "W_out(RC_NODE)", W_out(RC_NODE,1:OUT_NODE)
+        close(47)
+        close(45)
+    !    close(46)
+        enddo
+    
+        endif
+        enddo
+        call MPI_Finalize(ierr)
+        !write (filename, '("./data_err/RCerr_dt."i5.5 )') idtldtN
+        !open(47,file=filename ,position='append')
+        !write(47,*) ""
+        !close(47)
+  !endif
+  enddo
+  !call MPI_Finalize(ierr)
+    
 
-
- !   do i=1,out_node
- !   do j=1,rc_step
- !       s_rcT(i,j) = s_rc(j,i)
- !   enddo
- !   enddo
- !   do i=1,out_node
- !   do j=1,rc_node
- !       w_outT(i,j) = W_out(j,i)
- !   enddo
- !   enddo
 
 100 format(a,i6,a,f15.10)
 200 format(a,f15.10)
-end subroutine rc_poseidon
+end program main
 !-----------------------------------------------------------------------------
+

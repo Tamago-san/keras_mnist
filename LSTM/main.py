@@ -32,17 +32,22 @@ class data_create:
         self.test_size = test_size
     
     def to_categorical_1D(self,y_f, num_classes):
-        y_tmp = []
-        for inum in y_f
+        #y_tmp = []
+        y_tmp1 = []
+        y_f = y_f.tolist()
+        for inum in y_f:
+            y_tmp=[]
             for i  in range(0,num_classes):
                 if inum == i:
-                    y_tmp = 1
-                    else :
-                        y_tmp = 0
+                    y_tmp.append(1)
+                else :
+                    y_tmp.append(0)
             for i in range(0,784):
-                y_tmp = y_tmp
-        
-        return y_tmp,astype(float 64)
+                y_tmp1.extend(y_tmp)
+                #print(len(y_tmp1))
+        y_tmp1 = np.array(y_tmp1).reshape(-1,num_classes).astype('int64')
+        print(y_tmp1.shape)
+        return y_tmp1
         
     def d_3D(self,x_train0,y_train0,x_test0,y_test0):
         x_train0 = x_train0.reshape(x_train0.shape[0], 28, 28, 1).astype('float64')/255
@@ -71,15 +76,15 @@ class data_create:
         #y_train = y_train0[0:500]
         
         # convert class vectors to binary class matrices
-        y_train0 = keras.utils.to_categorical(y_train0, num_classes)
         y_test0  = keras.utils.to_categorical(y_test0 , num_classes)
+        y_train0 = keras.utils.to_categorical(y_train0, num_classes)
         
         return (x_train0,y_train0,x_test0,y_test0)
 
 
     def d_1D(self,x_train0,y_train0,x_test0,y_test0):
-        x_train0 = x_train0.reshape(-1) # 2次元配列を1次元に変換
-        x_test0  = x_test0.reshape(-1)
+        x_train0 = x_train0[:100,:].reshape(-1) # 2次元配列を1次元に変換
+        x_test0  = x_test0[:250].reshape(-1)
         x_train0 = x_train0.astype('float64')   # int型をfloat64型に変換
         x_test0  = x_test0.astype('float64')
         
@@ -95,13 +100,12 @@ class data_create:
         # convert class vectors to binary class matrices
         #y_train0 = keras.utils.to_categorical(y_train0, num_classes)
         #y_test0  = keras.utils.to_categorical(y_test0 , num_classes)
-        y_train0 = to_categorical_1D(y_train0, num_classes)
-        y_test0  = to_categorical_1D(y_test0, num_classes)
-        
-        
-        
-    
+        y_train0 = self.to_categorical_1D(y_train0[:100], num_classes)
+        y_test0  = self.to_categorical_1D(y_test0[:250], num_classes)
+        print(y_train0)
         return (x_train0,y_train0,x_test0,y_test0)
+
+
 
 class machine_construction:
     
@@ -156,7 +160,7 @@ class machine_construction:
                             validation_data=(self.x_test, self.y_test))
         
     
-    def call_fortran_rc(self,in_node,_out_node,_rc_node,_traning_step,_rc_step):
+    def call_fortran_rc(self,_in_node,_out_node,_rc_node,_traning_step,_rc_step):
         
         self.x_train=self.x_train.T.copy()
         self.x_test =self.x_test .T.copy()
@@ -189,6 +193,8 @@ class machine_construction:
         f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
                         self.x_train,self.y_train,self.x_test,self.y_test,W_out)
         
+        
+        
 
 
 
@@ -216,8 +222,9 @@ mc=machine_construction(x_train,y_train,x_test,y_test)
 #mc.evaluate()
 
 
-
-mc.call_fortran_rc(in_node,out_node,rc_node,traning_step,rc_step)
+print(x_train.shape[0])
+print(x_test.shape[0])
+mc.call_fortran_rc(in_node,out_node,rc_node,x_train.shape[0],x_test.shape[0])
 
 
 
