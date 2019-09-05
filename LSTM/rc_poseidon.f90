@@ -867,7 +867,7 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,traning_step00,rc_step00,&
                 call RC_OWN(Vx,Vy,istep)
                 if(istep<=int(30.d0/dt_l) ) then
                     if(mod(istep,ceiling(1.d0/(dt_l*1.d2) ) ) == 0) &
-                            write(45,"(11e14.6)") U_data(1,1),S_rc(1,1:OUT_NODE),S_data(1,1:OUT_NODE)
+                            write(45,"(11e14.3)") U_data(1,1),S_rc(1,1:OUT_NODE),S_data(1,1:OUT_NODE)
                 endif
                 Vx_tmp(:,:) = Vx(:,:)
                 Vy_tmp(:,:) = Vy(:,:)
