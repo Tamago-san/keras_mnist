@@ -9,7 +9,7 @@ from keras.layers import Conv2D, MaxPooling2D
 import numpy as np
 import ctypes
 
-batch_size= 128
+batch_size= 4
 num_classes = 10
 epochs = 20
 step_len=1
@@ -126,11 +126,11 @@ class machine_construction:
         
     def call_Keras_RNN(self):
         model = Sequential()
-        model.add(SimpleRNN(10, batch_input_shape=(None, 784,1), return_sequences=False))
+        model.add(SimpleRNN(20, batch_input_shape=(None, 784,1), return_sequences=False))
         model.add(Dense(10))
         model.add(Activation("softmax"))
         model.compile(loss='mean_squared_error',
-              optimizer=SGD(),
+              optimizer='adam',
               metrics=['accuracy'])
         #model.compile(loss='categorical_crossentropy',
         #              optimizer=RMSprop(),
@@ -197,12 +197,14 @@ class machine_construction:
         
         
 
-
+#曲がり　大正時代　97年　先々代。昭和二年。関東大震災直後。
 
 (x_train0, y_train0), (x_test0, y_test0) = mnist.load_data()
 mnist_d=data_create()
-#print(x_train0.shape)
-(x_train,y_train,x_test,y_test)=mnist_d.d_1D(x_train0,y_train0,x_test0,y_test0)
+#(x_train,y_train,x_test,y_test)=mnist_d.d_1D(x_train0,y_train0,x_test0,y_test0)
+(x_train,y_train,x_test,y_test)=mnist_d.d_2D(x_train0,y_train0,x_test0,y_test0)
+
+
 
 #print(x_train.shape)
 
@@ -218,9 +220,9 @@ mnist_d=data_create()
 
 
 mc=machine_construction(x_train,y_train,x_test,y_test,Wout)
-#mc.call_Keras_RNN()
+mc.call_Keras_RNN()
 #mc.call_Keras_CNN()
-#mc.evaluate()
+mc.evaluate()
 
 
 print(x_train.shape[0])
@@ -229,11 +231,11 @@ mc.call_fortran_rc(in_node,out_node,rc_node,x_train.shape[0],x_test.shape[0])
 
 
 
-#history = model.fit(x_train, y_train,
-#                    batch_size=batch_size,
-#                    epochs=epochs,
-#                    verbose=1,
-#                    validation_data=(x_test, y_test))
+history = model.fit(x_train, y_train,
+                    batch_size=batch_size,
+                    epochs=epochs,
+                    verbose=1,
+                    validation_data=(x_test, y_test))
                     
 #score = mc.model.evaluate(x_test, y_test, verbose=0)
 #print(123)
