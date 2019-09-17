@@ -11,6 +11,9 @@ from scipy import signal # audio processing
 from scipy.io import wavfile # reading the wavfile
 from matplotlib import pyplot as plt
 
+from keras.models import Sequential
+from keras.layers import LSTM, Dense, Dropout
+
 
 
 #PATH = '../input/train/audio/'
@@ -27,8 +30,8 @@ def load_files(path):
     print(train_labels)
     train_labels.remove('_background_noise_')
     
-    labels_to_keep = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', '_background_noise_']
-
+#    labels_to_keep = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', '_background_noise_']
+    labels_to_keep = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
     train_file_labels = dict()
     for label in train_labels:
         files = os.listdir(PATH + '/' + label)
@@ -79,6 +82,7 @@ files = glob(PATH + '_bac*/*.wav')#バックグラウンドノイズを取得
 print(files)
 #
 ## silence background samples
+#バックグラウンドノイズには1秒につき16000点ある→1秒毎に取り出す→all_silに格納
 all_sil = []
 for s in files:
     sr, audio = wavfile.read(s)
@@ -93,14 +97,27 @@ for s in files:
         all_sil.append(sample_)
 #plt.plot(sample)
 #print(all_sil)
+#plt.plot(all_sil)
 #plt.savefig("foo.png")
 print(len(all_sil))
 print(all_sil[0].shape)
-sil_data =  np.zeros((392, 16000, ))
-for i,d in enumerate(all_sil):
-    sil_data[i] = d
-print(sil_data.shape)
-#
+print(np.array(all_sil).shape)
+
+
+
+#リストをnumpyとしてsil_dataに格納
+#やり方1
+#sil_data =  np.zeros((len(all_sil), 16000, ))
+#for i,d in enumerate(all_sil):
+#    sil_data[i] = d
+#やり方2
+sil_data=np.array(all_sil,dtype = 'float').reshape(len(all_sil), 16000, )
+#print(np.array(all_sil,dtype = 'float').reshape(len(all_sil), 16000, ))
+print(sil_data)
+
+
+
+
 ## Writing functions to extract the data, script from kdnuggets:
 ## www.kdnuggets.com/2016/09/urban-sound-classification-neural-networks-tensorflow.html
 def extract_feature(path):
@@ -132,12 +149,13 @@ def parse_audio_files(files, word2id, unk = False):
     return np.array(features), one_hot
 
 
-files = train.loc[train['label'] != 'unknown']['file'].values
+files = train.loc[train['label'] != 'unknown']['file'].values #filesにunknown以外格納（つまり0から9の数字）
 print(len(files))
 print(files[:10])
 #
 # playing around with the data for now
-
+#================================================================================
+#試しに3の数字でやってみる。
 #train_audio_path = '../input/train/audio/'
 train_audio_path = PATH
 filename = '/tree/24ed94ab_nohash_0.wav' # --> 'Yes'
@@ -145,33 +163,40 @@ sample_rate, audio = wavfile.read(str(train_audio_path) + filename)
 plt.figure(figsize = (15, 4))
 print(sample_rate)
 plt.plot(audio)
-plt.savefig("foo.png")
+plt.savefig("foo3.png")
 #ipd.Audio(audio, rate=sample_rate)
-
-
 # goto: https://medium.com/@ageitgey/machine-learning-is-fun-part-6-how-to-do-speech-recognition-with-deep-learning-28293c162f7a
 # We convert it into chunks of 20ms each i.e. units of 320
 audio_chunks = []
-n_chunks = int(audio.shape[0]/320)
-print(n_chunks)
+n_chunks = int(audio.shape[0]/320)#320でひとかたまり(16000/320=50)
+print(n_chunks)#50
 for i in range(n_chunks):
     chunk = audio[i*320: (i+1)*320]
     audio_chunks.append(chunk)
-audio_chunk = np.array(audio_chunks)
+audio_chunk = np.array(audio_chunks).reshape(-1,320)
+print(audio_chunk.shape)
+print(audio_chunk)
+#================================================================================
+
 
 # we now convert it to spertogram
+#http://aidiary.hatenablog.com/entry/20120211/1328964624
 # goto: https://www.kaggle.com/davids1992/data-visualization-and-investigation
 def log_specgram(audio, sample_rate, window_size=10,
                  step_size=10, eps=1e-10):
     nperseg = int(round(window_size * sample_rate / 1e3))
     noverlap = int(round(step_size * sample_rate / 1e3))
-    _, _, spec = signal.spectrogram(audio,
+    a, b, spec = signal.spectrogram(audio,
                                     fs=sample_rate,
                                     window='hann',
                                     nperseg=nperseg,
                                     noverlap=noverlap,
                                     detrend=False)
-    return np.log(spec.T.astype(np.float32) + eps)
+    #spectrogramの返り値は(時間,分解次元)
+#    print(a)
+#    print(b)
+#(batch_size, timesteps, input_dim)
+    return np.log(spec.astype(np.float32) + eps)
 
 
 spectrogram = log_specgram(audio, sample_rate, 10, 0)
@@ -206,6 +231,7 @@ for i in range(len(files)):
 #    path = '../input/train/audio/' + str(folders[i]) + '/' + str(files[i])
     path =  str(files[i])
     paths.append(path)
+
 def audio_to_data(path):
     # we take a single path and convert it into data
     sample_rate, audio = wavfile.read(path)
@@ -213,11 +239,11 @@ def audio_to_data(path):
     return spectrogram.T
 
 def paths_to_data(paths,labels):
-    data = np.zeros(shape = (len(paths), 81, 100))
+    data = np.zeros(shape = (len(paths), 100, 81))
     indexes = []
     for i in tqdm(range(len(paths))):
         audio = audio_to_data(paths[i])
-        if audio.shape != (81,100):
+        if audio.shape != (100,81):
             indexes.append(i)
         else:
             data[i] = audio
@@ -226,24 +252,23 @@ def paths_to_data(paths,labels):
     return data[:len(data)-len(indexes)], final_labels, indexes
 d,l,indexes = paths_to_data(paths,one_hot_l)
 #
-#labels = np.zeros(shape = [d.shape[0], len(l[0])])
-#for i,array in enumerate(l):
-#    for j, element in enumerate(array):
-#        labels[i][j] = element
-#print(labels.shape)
-#print(d[0].shape)
-#print(labels[0].shape)
-#
-#
-#from keras.models import Sequential
-#from keras.layers import LSTM, Dense, Dropout
-#
-#model = Sequential()
-#model.add(LSTM(256, input_shape = (81, 100)))
-## model.add(Dense(1028))
-#model.add(Dropout(0.2))
-#model.add(Dense(128))
-#model.add(Dropout(0.2))
-#model.add(Dense(12, activation = 'softmax'))
-#model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
-#model.summary()
+labels = np.zeros(shape = [d.shape[0], len(l[0])])
+for i,array in enumerate(l):
+    for j, element in enumerate(array):
+        labels[i][j] = element
+print(labels.shape)
+print(d[0].shape)
+print(d.shape)
+print(labels[0].shape)
+
+
+model = Sequential()
+model.add(LSTM(256, input_shape = (100, 81)))
+# model.add(Dense(1028))
+model.add(Dropout(0.2))
+model.add(Dense(128))
+model.add(Dropout(0.2))
+model.add(Dense(12, activation = 'softmax'))
+model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
+model.summary()
+model.fit(d, labels, batch_size = 1024, epochs = 10)
