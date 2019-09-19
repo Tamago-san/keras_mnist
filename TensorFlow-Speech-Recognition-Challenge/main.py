@@ -23,7 +23,7 @@ def remove_label_from_file(label, fname):
     #print(label)
     #print(fname)
     #print(path + label + '/' + fname[len(label)+1:])
-    return PATH + label + '/' + fname[len(label)+1:]
+    return PATH + fname
     
 
 def load_files():
@@ -39,15 +39,15 @@ def load_files():
     
 #    labels_to_keep = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', '_background_noise_']
     labels_to_keep = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
-    train_file_labels = dict()
+    train_file_labels = dict()#dic["key"] = "value" →{"key" : "value"}
     for label in train_labels:
         files = os.listdir(PATH + '/' + label)
         for f in files:
             train_file_labels[label + '/' + f] = label # sample_dict[7] = 8 #7というキーで値は8。これを辞書へ追加
     
-#    print(train_file_labels)#'six/471a0925_nohash_3.wav': 'six' #パスを入力するとそのファイルがなんの音かわかる！
+    #print(train_file_labels.values()) #'six/471a0925_nohash_3.wav': 'six' #パスを入力するとそのファイルがなんの音かわかる！
     train = pd.DataFrame.from_dict(train_file_labels, orient='index')
-    #print(train)
+    print(train)
     train = train.reset_index(drop=False)#indexを残しておく
     #print(train)
     train = train.rename(columns={'index': 'file', 0: 'folder'})
@@ -55,12 +55,13 @@ def load_files():
     train = train[['folder', 'file']]
     #print(train)
     train = train.sort_values('file')
-    #print(train)
+    print(train)
     train = train.reset_index(drop=True)
     print(train)
     
 
     train['file'] = train.apply(lambda x: remove_label_from_file(*x), axis=1)
+    print(train)
     train['label'] = train['folder'].apply(lambda x: x if x in labels_to_keep else 'unknown')
     labels_to_keep.append('unknown')
     return train, labels_to_keep
@@ -213,6 +214,8 @@ plt.savefig("foo2.png")
 labels = sorted(labels_to_keep)
 word2id = dict((c,i) for i,c in enumerate(labels))
 label = train['label'].values
+print(train['label'])
+print('こここおこ')
 label = [word2id[l] for l in label]
 print(labels)
 def make_one_hot(seq, n):
