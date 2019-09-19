@@ -19,7 +19,14 @@ from keras.layers import LSTM, Dense, Dropout
 #PATH = '../input/train/audio/'
 PATH = './data/train/audio/'
 
-def load_files(path):
+def remove_label_from_file(label, fname):
+    #print(label)
+    #print(fname)
+    #print(path + label + '/' + fname[len(label)+1:])
+    return PATH + label + '/' + fname[len(label)+1:]
+    
+
+def load_files():
     # write the complete file loading function here, this will return
     # a dataframe having files and labels
     # loading the files
@@ -52,22 +59,18 @@ def load_files(path):
     train = train.reset_index(drop=True)
     print(train)
     
-    def remove_label_from_file(label, fname):
-        #print(label)
-        #print(fname)
-        #print(path + label + '/' + fname[len(label)+1:])
-        return path + label + '/' + fname[len(label)+1:]
-    
 
     train['file'] = train.apply(lambda x: remove_label_from_file(*x), axis=1)
     train['label'] = train['folder'].apply(lambda x: x if x in labels_to_keep else 'unknown')
     labels_to_keep.append('unknown')
-
     return train, labels_to_keep
     
 
-train, labels_to_keep = load_files(PATH)
+train, labels_to_keep = load_files()
 print(train)
+print(labels_to_keep)
+#['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_', 'unknown']
+
 # making word2id dict
 word2id = dict((c,i) for i,c in enumerate(sorted(labels_to_keep)))
 print(word2id)
