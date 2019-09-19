@@ -129,7 +129,12 @@ class create_dataset:
         d,l,indexes = paths_to_data(self.all_data['file'].values.tolist(), one_hot_l)
         print(d)
         print(l)
-        return one_hot_l
+        labels = np.zeros(shape = [d.shape[0],len(l[0]) ])
+        for i,array in enumerate(l):
+            for j,element in enumerate(array):
+                labels[i][j] = element
+                
+        return d,labels
 
 class machine_construction:
     def __init__(self,x_train,y_train):
@@ -145,7 +150,7 @@ class machine_construction:
         model.add(Dense(12, activation = 'softmax'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
         model.summary()
-        model.fit(x_train, y_train, batch_size = 1024, epochs = 10)
+        model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = 10)
     
 
 
@@ -159,8 +164,8 @@ if __name__ == '__main__':
     cd=create_dataset(all_train_data,PATH_train)
     data, one_hot_l = cd.main1()
     
-     mc=machine_construction(data, one_hot_l)
-     mc.call_Keras_LSTM()
+    mc=machine_construction(data, one_hot_l)
+    mc.call_Keras_LSTM()
     
     
     
