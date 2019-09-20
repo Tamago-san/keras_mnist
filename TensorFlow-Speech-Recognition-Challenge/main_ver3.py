@@ -38,9 +38,11 @@ class data_load:
         self.path=path
         self.labels_to_keep = LABELS_TO_KEEP
         
-    def load_files(self):
-        def append_relative_path(label, filename):
+    def append_relative_path(self,label, filename):
             return self.path + filename
+        
+    def load_files(self):
+
         #とりあえず全てロードしてLABELS_TO_KEEP以外の音はUNKNOWNに設定
         train_file_labels = os.listdir(self.path)
         train_file_labels.remove('_background_noise_')
@@ -59,7 +61,7 @@ class data_load:
         train = train.sort_values('file')
         train = train.reset_index(drop=True)
         
-        train['file'] = train.apply(lambda x: append_relative_path(*x), axis=1)#*は自動的に分けてくれる！
+        train['file'] = train.apply(lambda x: self.append_relative_path(*x), axis=1)#*は自動的に分けてくれる！
         train['label']= train['folder'].apply(lambda x : x if x in self.labels_to_keep else 'unknown')#新たにラベルのカラムを追加
         self.labels_to_keep.append('unknown')
         
@@ -75,56 +77,54 @@ class create_dataset:
         self.labels_to_keep = LABELS_TO_KEEP
         print(self.all_data)
         
+
+    def log_specgram(self,audio, sample_rate, window_size=10,
+                     step_size=10, eps=1e-10):
+        nperseg = int(round(window_size * sample_rate / 1e3))
+        noverlap = int(round(step_size * sample_rate / 1e3))
+        t, f, spec = signal.spectrogram(audio,
+                                        fs=sample_rate,
+                                        window='hann',
+                                        nperseg=nperseg,
+                                        noverlap=noverlap,
+                                        detrend=False)
+        return np.log(spec.astype(np.float32) +eps )
     
+    
+    def make_one_hot(self,seq, voice_size):
+        seq_new = np.zeros(shape = (len(seq),voice_size))
+        for i,s in enumerate(seq):
+            seq_new[i][s] = 1.
+        return seq_new
+        
+    def audio_to_data(self,path):
+        # we take a single path and convert it into data
+        sample_rate, audio = wavfile.read(path)
+        spectrogram = self.log_specgram(audio, sample_rate, 10, 0)
+        return spectrogram.T
+    
+    def paths_to_data(self,paths,labels):
+        data = np.zeros(shape = (len(paths), 100, 81))
+        indexes = []
+        for i in tqdm(range(len(paths))):
+            #print(paths[i])
+            audio = self.audio_to_data(paths[i])
+            if audio.shape != (100,81):
+                indexes.append(i)
+            else:
+                data[i] = audio
+        final_labels = [l for i,l in enumerate(labels) if i not in indexes]
+        print('Number of instances with inconsistent shape:', len(indexes))
+        
+        return data[:len(data)-len(indexes)], final_labels, indexes
     
     def main1(self):
-        def log_specgram(audio, sample_rate, window_size=10,
-                         step_size=10, eps=1e-10):
-            nperseg = int(round(window_size * sample_rate / 1e3))
-            noverlap = int(round(step_size * sample_rate / 1e3))
-            t, f, spec = signal.spectrogram(audio,
-                                            fs=sample_rate,
-                                            window='hann',
-                                            nperseg=nperseg,
-                                            noverlap=noverlap,
-                                            detrend=False)
-            return np.log(spec.astype(np.float32) +eps )
-        
-        
-        def make_one_hot(seq, voice_size):
-            seq_new = np.zeros(shape = (len(seq),voice_size))
-            for i,s in enumerate(seq):
-                seq_new[i][s] = 1.
-            return seq_new
-            
-        def audio_to_data(path):
-            # we take a single path and convert it into data
-            sample_rate, audio = wavfile.read(path)
-            spectrogram = log_specgram(audio, sample_rate, 10, 0)
-            return spectrogram.T
-        
-        def paths_to_data(paths,labels):
-            data = np.zeros(shape = (len(paths), 100, 81))
-            indexes = []
-            for i in tqdm(range(len(paths))):
-                #print(paths[i])
-                audio = audio_to_data(paths[i])
-                if audio.shape != (100,81):
-                    indexes.append(i)
-                else:
-                    data[i] = audio
-            final_labels = [l for i,l in enumerate(labels) if i not in indexes]
-            print('Number of instances with inconsistent shape:', len(indexes))
-            
-            return data[:len(data)-len(indexes)], final_labels, indexes
-            
-            
-            
+
         word2id = dict( (c,i) for i,c in enumerate(sorted(self.labels_to_keep) ) )
         print(self.all_data)
         label = self.all_data['label'].values
         label = [word2id[l] for l in label ]
-        one_hot_l = make_one_hot(label,12)
+        one_hot_l = self.make_one_hot(label,12)
         print(one_hot_l)
         d,l,indexes = paths_to_data(self.all_data['file'].values.tolist(), one_hot_l)
         print(d)
