@@ -82,12 +82,14 @@ class create_dataset:
                      step_size=10, eps=1e-10):
         nperseg = int(round(window_size * sample_rate / 1e3))
         noverlap = int(round(step_size * sample_rate / 1e3))
-        t, f, spec = signal.spectrogram(audio,
+        freqs, time, spec = signal.spectrogram(audio,
                                         fs=sample_rate,
                                         window='hann',
                                         nperseg=nperseg,
                                         noverlap=noverlap,
                                         detrend=False)
+        print("完成の次元")
+        print(np.log(spec.astype(np.float32) +eps ).shape)
         return np.log(spec.astype(np.float32) +eps )
     
     
