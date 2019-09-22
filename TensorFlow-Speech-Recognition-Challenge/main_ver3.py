@@ -91,6 +91,25 @@ class create_dataset:
         print("完成の次元")
         print(np.log(spec.astype(np.float32) +eps ).shape)
         return np.log(spec.astype(np.float32) +eps )
+        
+    def mel_specgram(self,audio,sample_rate,n_mels = 128):
+        # From this tutorial
+        # https://github.com/librosa/librosa/blob/master/examples/LibROSA%20demo.ipynb
+        S = librosa.feature.melspectrogram(np.array(audio,dtype = 'float'), sr=sample_rate, n_mels=128)
+        
+        # Convert to log scale (dB). We'll use the peak power (max) as reference.
+        log_S = librosa.power_to_db(S, ref=np.max)
+        print("完成の次元")
+        print(log_S.shape)#(128, 32)
+        
+        return log_S
+    
+    def mfcc_specgram(self,audio,sample_rate):
+        mfccs = librosa.feature.mfcc(audio, sr=sample_rate)
+        print("完成の次元")
+        print(mfccs_S.shape)#(128, 32)(次元,時間)
+        return mfccs
+
     
     
     def make_one_hot(self,seq, voice_size):
@@ -106,7 +125,7 @@ class create_dataset:
         return spectrogram.T
     
     def paths_to_data(self,paths,labels):
-        data = np.zeros(shape = (len(paths), 100, 81))
+        data = np.zeros(shape = (len(paths), 100,81))
         indexes = []
         for i in tqdm(range(len(paths))):
             #print(paths[i])
@@ -145,7 +164,7 @@ class machine_construction:
     
     def call_Keras_LSTM(self):
         model = Sequential()
-        model.add(LSTM(256, input_shape = (100, 81)))
+        model.add(LSTM(256, input_shape = (100,81)))
         model.add(Dropout(0.2))
         model.add(Dense(128))
         model.add(Dropout(0.2))

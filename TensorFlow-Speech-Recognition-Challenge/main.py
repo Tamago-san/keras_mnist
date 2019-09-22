@@ -19,6 +19,9 @@ import librosa
 #PATH = '../input/train/audio/'
 PATH = './data/train/audio/'
 
+time_len = 100
+ndim =81
+
 def remove_label_from_file(label, fname):
     #print(label)
     #print(fname)
@@ -196,18 +199,43 @@ def log_specgram(audio, sample_rate, window_size=10,
                                     nperseg=nperseg,
                                     noverlap=noverlap,
                                     detrend=False)
-    print("完成の次元")
-    print(np.log(spec.astype(np.float32) +eps ).shape)
+    #print("完成の次元")
+    #print(np.log(spec.astype(np.float32) +eps ).shape)
     #spectrogramの返り値は(時間,分解次元)
 #    print(a)
 #    print(b)
 #(batch_size, timesteps, input_dim)
     return np.log(spec.astype(np.float32) + eps)
+    
+    
+def mel_specgram(audio,sample_rate,n_mels = 128):
+    # From this tutorial
+    # https://github.com/librosa/librosa/blob/master/examples/LibROSA%20demo.ipynb
+    S = librosa.feature.melspectrogram(np.array(audio,dtype = 'float'), sr=sample_rate, n_mels=128)
+    
+    # Convert to log scale (dB). We'll use the peak power (max) as reference.
+    log_S = librosa.power_to_db(S, ref=np.max)
+    print("完成の次元")
+    print(log_S.shape)#(128, 32)
+    
+    return log_S
+
+def mfcc_specgram(audio,sample_rate):
+    mfccs = librosa.feature.mfcc(audio, sr=sample_rate)
+    print("完成の次元")
+    print(mfccs_S.shape)#(128, 32)(次元,時間)
+    return mfccs
 
 
 spectrogram = log_specgram(audio, sample_rate, 10, 0)
 spec = spectrogram.T
 print(spec.shape)
+spectrogram2 = mel_specgram(audio, sample_rate)
+spec2 = spectrogram2.T#(128, 32)
+print(spec2.shape)
+spectrogram3 = mel_specgram(audio, sample_rate)
+spec3 = spectrogram3.T#(128, 32)
+print(spec3.shape)
 plt.figure(figsize = (15,4))
 plt.imshow(spec, aspect='auto', origin='lower')
 plt.savefig("foo2.png")
@@ -244,14 +272,14 @@ def audio_to_data(path):
     # we take a single path and convert it into data
     sample_rate, audio = wavfile.read(path)
     spectrogram = log_specgram(audio, sample_rate, 10, 0)
-    return spectrogram.T
+    return spectrogram.T#(分解次元,時間)に変更
 
 def paths_to_data(paths,labels):
-    data = np.zeros(shape = (len(paths), 100, 81))
+    data = np.zeros(shape = (len(paths), time_len,ndim))
     indexes = []
     for i in tqdm(range(len(paths))):
         audio = audio_to_data(paths[i])
-        if audio.shape != (100,81):
+        if audio.shape != (time_len,ndim):
             indexes.append(i)
         else:
             data[i] = audio
@@ -271,7 +299,7 @@ print(labels[0].shape)
 
 
 model = Sequential()
-model.add(LSTM(256, input_shape = (100, 81)))
+model.add(LSTM(256, input_shape = (time_len, ndim)))
 # model.add(Dense(1028))
 model.add(Dropout(0.2))
 model.add(Dense(128))
