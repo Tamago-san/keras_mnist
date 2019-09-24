@@ -1,4 +1,5 @@
 #ver2を諦めて写経と合わせて効率化
+#パイソンでは（：,時間）で帰ってきがち
 import keras
 from keras.datasets import mnist
 from keras.models import Sequential
@@ -19,6 +20,11 @@ from scipy import signal # audio processing
 from scipy.io import wavfile # reading the wavfile
 from matplotlib import pyplot as plt
 from glob import glob # file handling
+import librosa
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
+import sklearn
+
 
 '''
 TensorFlow-Speech-Recognition-Challenge/
@@ -32,6 +38,9 @@ PATH_train = './data/train/audio/'
 PATH_test =  './data/test/audio/'
 LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
 
+ndim =20 #81#128#20
+nstep =32 #100#32#32
+epoch =20
 
 class data_load:
     def __init__(self,path):
@@ -75,6 +84,8 @@ class create_dataset:
         self.all_data = data
         self.path=path
         self.labels_to_keep = LABELS_TO_KEEP
+        self.input_step = 0
+        self.input_dim= 0
         print(self.all_data)
         
 
@@ -88,27 +99,33 @@ class create_dataset:
                                         nperseg=nperseg,
                                         noverlap=noverlap,
                                         detrend=False)
-        print("完成の次元")
-        print(np.log(spec.astype(np.float32) +eps ).shape)
-        return np.log(spec.astype(np.float32) +eps )
+        #print("完成の次元")#完成の次元
+        #print(np.log(spec.astype(np.float32) +eps ).shape)#(81, 100)1000ms=1s
+        return np.log(spec.astype(np.float32) +eps ).T#(時間,次元)で返す
         
-    def mel_specgram(self,audio,sample_rate,n_mels = 128):
+    def mel_specgram(self,audio,sample_rate,n_mels = ndim): #ndim=128
         # From this tutorial
         # https://github.com/librosa/librosa/blob/master/examples/LibROSA%20demo.ipynb
-        S = librosa.feature.melspectrogram(np.array(audio,dtype = 'float'), sr=sample_rate, n_mels=128)
+        S = librosa.feature.melspectrogram(np.array(audio,dtype = 'float'), sr=sample_rate, n_mels=ndim)
         
         # Convert to log scale (dB). We'll use the peak power (max) as reference.
         log_S = librosa.power_to_db(S, ref=np.max)
-        print("完成の次元")
-        print(log_S.shape)#(128, 32)
+        #print("完成の次元")
+        #print(log_S.shape)#(128, 32)
         
-        return log_S
+        return log_S.T#(時間,次元)で返す
     
     def mfcc_specgram(self,audio,sample_rate):
-        mfccs = librosa.feature.mfcc(audio, sr=sample_rate)
-        print("完成の次元")
-        print(mfccs_S.shape)#(128, 32)(次元,時間)
-        return mfccs
+        mfccs = librosa.feature.mfcc(np.array(audio,dtype = 'float64'), sr=sample_rate,n_mfcc=ndim)
+        # (n_mfcc, sr*duration/hop_length)
+        # DCT したあとで取得する係数の次元(デフォルト n_mfcc =20) ,
+        #n_mfccが取得するDCT低次項の数＝変換後のBinの数
+        #サンプリングレートxオーディオファイルの長さ（=全フレーム数）/ STFTスライドサイズ(デフォルト512)
+        #print("完成の次元")
+        #print(mfccs.shape)#(128, 32)(次元,時間)
+        mfccs = sklearn.preprocessing.scale(mfccs, axis=1)
+        
+        return mfccs.T#(時間,次元)で返す
 
     
     
@@ -121,16 +138,18 @@ class create_dataset:
     def audio_to_data(self,path):
         # we take a single path and convert it into data
         sample_rate, audio = wavfile.read(path)
-        spectrogram = self.log_specgram(audio, sample_rate, 10, 0)
-        return spectrogram.T
+        #spectrogram = self.log_specgram(audio, sample_rate, 10, 0)
+        #spectrogram = self.mel_specgram(audio, sample_rate)
+        spectrogram = self.mfcc_specgram(audio, sample_rate)
+        return spectrogram
     
     def paths_to_data(self,paths,labels):
-        data = np.zeros(shape = (len(paths), 100,81))
+        data = np.zeros(shape = (len(paths),nstep,ndim))
         indexes = []
         for i in tqdm(range(len(paths))):
             #print(paths[i])
-            audio = self.audio_to_data(paths[i])
-            if audio.shape != (100,81):
+            audio = self.audio_to_data(paths[i])#ここで（時間,信号次元)で返り値を得るように作る
+            if audio.shape != (nstep,ndim):
                 indexes.append(i)
             else:
                 data[i] = audio
@@ -147,15 +166,15 @@ class create_dataset:
         label = [word2id[l] for l in label ]
         one_hot_l = self.make_one_hot(label,12)
         print(one_hot_l)
-        d,l,indexes = paths_to_data(self.all_data['file'].values.tolist(), one_hot_l)
-        print(d)
-        print(l)
-        labels = np.zeros(shape = [d.shape[0],len(l[0]) ])
+        comp_data,l,indexes = self.paths_to_data(self.all_data['file'].values.tolist(), one_hot_l)
+        print(comp_data.shape[0])#58252
+        print(len(l[0]))#12
+        comp_labels = np.zeros(shape = [comp_data.shape[0],len(l[0]) ])#(データ長さ,ラベル長が)
         for i,array in enumerate(l):
             for j,element in enumerate(array):
-                labels[i][j] = element
+                comp_labels[i][j] = element
                 
-        return d,labels
+        return comp_data,comp_labels
 
 class machine_construction:
     def __init__(self,x_train,y_train):
@@ -164,14 +183,14 @@ class machine_construction:
     
     def call_Keras_LSTM(self):
         model = Sequential()
-        model.add(LSTM(256, input_shape = (100,81)))
+        model.add(LSTM(256, input_shape = (nstep,ndim)))
         model.add(Dropout(0.2))
         model.add(Dense(128))
         model.add(Dropout(0.2))
         model.add(Dense(12, activation = 'softmax'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
         model.summary()
-        model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = 10)
+        model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
     
 
 

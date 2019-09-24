@@ -19,8 +19,8 @@ import librosa
 #PATH = '../input/train/audio/'
 PATH = './data/train/audio/'
 
-time_len = 100
-ndim =81
+time_len = 32
+ndim =128
 
 def remove_label_from_file(label, fname):
     #print(label)
@@ -215,16 +215,16 @@ def mel_specgram(audio,sample_rate,n_mels = 128):
     
     # Convert to log scale (dB). We'll use the peak power (max) as reference.
     log_S = librosa.power_to_db(S, ref=np.max)
-    print("完成の次元")
-    print(log_S.shape)#(128, 32)
+    #print("完成の次元")
+    #print(log_S.shape)#(128, 32)
     
     return log_S
 
 def mfcc_specgram(audio,sample_rate):
-    mfccs = librosa.feature.mfcc(audio, sr=sample_rate)
-    print("完成の次元")
-    print(mfccs_S.shape)#(128, 32)(次元,時間)
-    return mfccs
+    mfccs = librosa.feature.mfcc(np.array(audio,dtype = 'float'), sr=sample_rate)
+    #print("完成の次元")
+    #print(mfccs.shape)#(128, 32)(次元,時間)
+    return mfccs.T
 
 
 spectrogram = log_specgram(audio, sample_rate, 10, 0)
@@ -271,7 +271,10 @@ for i in range(len(files)):
 def audio_to_data(path):
     # we take a single path and convert it into data
     sample_rate, audio = wavfile.read(path)
-    spectrogram = log_specgram(audio, sample_rate, 10, 0)
+    #spectrogram = log_specgram(audio, sample_rate, 10, 0)
+    #spectrogram = mel_specgram(audio, sample_rate)
+    spectrogram = mfcc_specgram(audio, sample_rate)
+    
     return spectrogram.T#(分解次元,時間)に変更
 
 def paths_to_data(paths,labels):
