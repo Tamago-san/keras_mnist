@@ -24,6 +24,8 @@ import librosa
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import MinMaxScaler
 import sklearn
+import warnings
+warnings.filterwarnings('ignore')
 
 
 '''
@@ -38,7 +40,7 @@ PATH_train = './data/train/audio/'
 PATH_test =  './data/test/audio/'
 LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
 
-ndim =20 #81#128#20
+ndim = 1 #81#128#20
 nstep =32 #100#32#32
 epoch =20
 
