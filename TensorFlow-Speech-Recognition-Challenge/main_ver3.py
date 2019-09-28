@@ -183,7 +183,7 @@ class machine_construction:
         self.x_train = x_train
         self.y_train = y_train
     
-    def call_Keras_LSTM(self):
+    def call_Keras_LSTM_a(self):
         model = Sequential()
         model.add(LSTM(256, input_shape = (nstep,ndim)))
         model.add(Dropout(0.2))
@@ -193,6 +193,45 @@ class machine_construction:
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
         model.summary()
         model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
+    
+    def call_Keras_LSTM_b(self):
+        model = Sequential()
+        model.add(LSTM(256, input_shape = (nstep,ndim)))
+        model.add(Dropout(0.2))
+        model.add(Dense(128))
+        model.add(Dropout(0.2))
+        model.add(Dense(12, activation = 'linear'))
+        model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
+        model.summary()
+        model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
+
+    def call_Keras_LSTM_c(self):
+        model = Sequential()
+        model.add(LSTM(128, input_shape = (nstep,ndim)))
+        model.add(Dense(12, activation = 'linear'))
+        model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
+        model.summary()
+        model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
+    
+    
+    def call_Keras_CNN(self):
+        model = Sequential()
+        model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(28, 28, 1)))
+        model.add(Conv2D(64, (3, 3), activation='relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Dropout(0.25))
+        model.add(Flatten())
+        model.add(Dense(128, activation='relu'))
+        model.add(Dropout(0.5))
+        model.add(Dense(10, activation='softmax'))
+        model.compile(loss='categorical_crossentropy',
+                      optimizer=RMSprop(),
+                      metrics=['accuracy'])
+        history = model.fit(self.x_train, self.y_train,
+                            batch_size=128,
+                            epochs=10,
+                            verbose=1,
+                            validation_data=(self.x_test, self.y_test))
     
 
 
@@ -207,7 +246,7 @@ if __name__ == '__main__':
     data, one_hot_l = cd.main1()
     
     mc=machine_construction(data, one_hot_l)
-    mc.call_Keras_LSTM()
+    mc.call_Keras_LSTM_a()
     
     
     
