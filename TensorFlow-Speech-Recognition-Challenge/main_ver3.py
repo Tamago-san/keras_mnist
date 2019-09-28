@@ -43,6 +43,9 @@ LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
 ndim = 1 #81#128#20
 nstep =32 #100#32#32
 epoch =20
+rc_node = 100
+Wout = np.empty()
+
 
 class data_load:
     def __init__(self,path):
@@ -184,6 +187,7 @@ class machine_construction:
         self.y_train = y_train
     
     def call_Keras_LSTM_a(self):
+        #最終的に(sample,nstep,ndim)
         model = Sequential()
         model.add(LSTM(256, input_shape = (nstep,ndim)))
         model.add(Dropout(0.2))
@@ -195,6 +199,7 @@ class machine_construction:
         model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
     
     def call_Keras_LSTM_b(self):
+        #最終的に(sample,nstep,ndim)
         model = Sequential()
         model.add(LSTM(256, input_shape = (nstep,ndim)))
         model.add(Dropout(0.2))
@@ -206,12 +211,48 @@ class machine_construction:
         model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
 
     def call_Keras_LSTM_c(self):
+        #最終的に(sample,nstep,ndim)
         model = Sequential()
         model.add(LSTM(128, input_shape = (nstep,ndim)))
         model.add(Dense(12, activation = 'linear'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
         model.summary()
         model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
+    
+    def call_fortran_rc(self,_in_node,_out_node,_rc_node,_traning_step,_rc_step):
+        
+        self.x_train=self.x_train.(-1,ndim).T.copy()
+        #self.x_test =self.x_test .(-1,ndim).T.copy()
+        self.y_train=self.y_train.T.copy().astype('float64')
+        #self.y_test =self.y_test .T.copy().astype('float64')
+        self.Wout = Wout.T.copy().astype('float64')
+
+        
+        f = np.ctypeslib.load_library("rc_poseidon.so", ".")
+        f.rc_poseidon_.argtypes = [
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            np.ctypeslib.ndpointer(dtype=np.float64),
+            np.ctypeslib.ndpointer(dtype=np.float64),
+            np.ctypeslib.ndpointer(dtype=np.float64),
+            np.ctypeslib.ndpointer(dtype=np.float64),
+            np.ctypeslib.ndpointer(dtype=np.float64),
+            ]
+        f.rc_poseidon_.restype = ctypes.c_void_p
+    
+        f_in_node = ctypes.byref(ctypes.c_int32(_in_node))
+        f_out_node = ctypes.byref(ctypes.c_int32(_out_node))
+        f_rc_node = ctypes.byref(ctypes.c_int32(_rc_node))
+        f_traning_step = ctypes.byref(ctypes.c_int32(_traning_step))
+        f_rc_step = ctypes.byref(ctypes.c_int32(_rc_step))
+    
+#        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
+#                        self.x_train,self.y_train,self.x_test,self.y_test,Wout)
+        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
+                        self.x_train,self.y_train,Wout)
     
     
     def call_Keras_CNN(self):
@@ -247,6 +288,7 @@ if __name__ == '__main__':
     
     mc=machine_construction(data, one_hot_l)
     mc.call_Keras_LSTM_a()
+    mc.call_fortran_rc(ndim,12,rc_node,data.shape[0]*data.shape[1],1000)
     
     
     
