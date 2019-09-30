@@ -44,7 +44,7 @@ ndim = 1 #81#128#20
 nstep =32 #100#32#32
 epoch =20
 rc_node = 100
-Wout = np.empty()
+Wout = np.empty(rc_node,rc_node)
 
 
 class data_load:
