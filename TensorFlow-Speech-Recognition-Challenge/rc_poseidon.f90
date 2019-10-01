@@ -699,7 +699,7 @@ end module cylinder
 !-----------------------------------------------------------------------------
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine rc_poseidon(in_node00,out_node00,rc_node00,samp_num00,samp_step00,traning_step00,rc_step00,&
-                    u_tr,s_tr,w_out0)
+                    u_tr,s_tr,u_rc,s_rc_data,w_out0)
   use cylinder
     implicit none
     integer(4), intent(inout) :: in_node00,out_node00,rc_node00,traning_step00,rc_step00
@@ -707,8 +707,8 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,samp_num00,samp_step00,tra
     real(8),    intent(inout) :: w_out0(rc_node00,out_node00)
     real(8),    intent(inout) ::u_tr(traning_step00,in_node00) !今は一次元、列サイズはトレーニング時間
     real(8),    intent(inout) ::s_tr(samp_num00,out_node00)  !出力次元数、列サイズはトレーニング時間
-!    real(8),    intent(inout) ::u_rc(rc_step00,in_node00) !今は一次元、列サイズはトレーニング時間
-!    real(8),    intent(inout) ::s_rc_data(rc_step00,out_node00)  !出力次元数、列サイズはトレーニング時間
+    real(8),    intent(inout) ::u_rc(rc_step00,in_node00) !今は一次元、列サイズはトレーニング時間
+    real(8),    intent(inout) ::s_rc_data(rc_step00,out_node00)  !出力次元数、列サイズはトレーニング時間
     real(kind=8) :: R_tr(traning_step00,rc_node00)
 !    real(kind=8) :: W_out(rc_node00,out_node00)
 !    real(kind=8) :: U_tr (traning_step00,in_node00)
@@ -818,8 +818,8 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,samp_num00,samp_step00,tra
             !write(32,*) dt*real(istep),Vx(NXmax/2,0)
         enddo
   
-!        Vx_tmp(:,:) = Vx(:,:)
-!        Vy_tmp(:,:) = Vy(:,:)
+        Vx_tmp(:,:) = Vx(:,:)
+        Vy_tmp(:,:) = Vy(:,:)
 
 
         write(*,*) "=========================================="
@@ -839,8 +839,10 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,samp_num00,samp_step00,tra
                 !call DATA_standard(2)
                 call march(Vx,Vy,P,1)
                 call mean_rirj(Vx,Vy,RiRj,RiSj,iste,samplep,isample)
-                Vx_tmp(:,:) = Vx(:,:)
-                Vy_tmp(:,:) = Vy(:,:)
+                if(mod(istep,sample_step00)==0) then
+                    Vx(:,:) = Vx_tmp(:,:)
+                    Vy(:,:) = Vy_tmp(:,:)
+                endif
             enddo
             write(*,*) "=========================================="
             write(*,*) "     INVERSE MATRIX CALCULATION"

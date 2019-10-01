@@ -227,11 +227,18 @@ class machine_construction:
     def call_fortran_rc(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_traning_step,_rc_step):
         
         
+        data_tmp = np.hstack(self.x_train,self.y_train)
+        np.random.shuffle(data_tmp)
+        #b[1:3, 2:4] # 1~2行目、2~3列目を抜き出す
+        x_tr = data_tmp[:int(data_tmp.shape(0)*0.8),0]
+        y_tr = data_tmp[:int(data_tmp.shape(0)*0.8),1:]
+        x_te = data_tmp[int(data_tmp.shape(0)*0.8):,0]
+        y_te = data_tmp[int(data_tmp.shape(0)*0.8):,1:]
         
-        self.x_train=self.x_train.reshape(-1,ndim).T.copy()
-        #self.x_test =self.x_test .(-1,ndim).T.copy()
-        self.y_train=self.y_train.T.copy().astype('float64')
-        #self.y_test =self.y_test .T.copy().astype('float64')
+        x_tr  =x_tr.reshape(-1,ndim).T.copy()
+        x_te  =x_te.reshape(-1,ndim).T.copy()
+        y_tr  =y_tr.T.copy().astype('float64')
+        y_te  =y_te.T.copy().astype('float64')
         Wout2 = Wout.T.copy().astype('float64')
 
         
@@ -247,8 +254,8 @@ class machine_construction:
             np.ctypeslib.ndpointer(dtype=np.float64),
             np.ctypeslib.ndpointer(dtype=np.float64),
             np.ctypeslib.ndpointer(dtype=np.float64),
-            #np.ctypeslib.ndpointer(dtype=np.float64),
-            #np.ctypeslib.ndpointer(dtype=np.float64),
+            np.ctypeslib.ndpointer(dtype=np.float64),
+            np.ctypeslib.ndpointer(dtype=np.float64),
             ]
         f.rc_poseidon_.restype = ctypes.c_void_p
     
@@ -263,7 +270,7 @@ class machine_construction:
 #        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
 #                        self.x_train,self.y_train,self.x_test,self.y_test,Wout)
         f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_samp_num,f_samp_step,f_traning_step,f_rc_step,
-                        self.x_train,self.y_train,Wout2)
+                        x_tr,y_tr,x_te,y_te,Wout2)
     
     
     def call_Keras_CNN(self):
