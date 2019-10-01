@@ -44,7 +44,8 @@ ndim = 1 #81#128#20
 nstep =32 #100#32#32
 epoch =20
 rc_node = 100
-Wout = np.empty(rc_node,rc_node)
+out_node =12
+Wout = np.empty((rc_node,out_node))
 
 
 class data_load:
@@ -149,37 +150,41 @@ class create_dataset:
         return spectrogram
     
     def paths_to_data(self,paths,labels):
-        data = np.zeros(shape = (len(paths),nstep,ndim))
+        data = np.zeros(shape = (len(paths),nstep,ndim))#len(paths)はサンプル数
         indexes = []
-        for i in tqdm(range(len(paths))):
+        for i in tqdm(range(len(paths))): #tqdmはプログレスバーの表示0からサンプル数
             #print(paths[i])
             audio = self.audio_to_data(paths[i])#ここで（時間,信号次元)で返り値を得るように作る
             if audio.shape != (nstep,ndim):
                 indexes.append(i)
             else:
-                data[i] = audio
-        final_labels = [l for i,l in enumerate(labels) if i not in indexes]
+                data[i] = audio#形状の一致しているもののみデータとして抽出。
+        
+        final_labels = [l for i,l in enumerate(labels) if i not in indexes]#形状の一致していないものを除外
         print('Number of instances with inconsistent shape:', len(indexes))
         
-        return data[:len(data)-len(indexes)], final_labels, indexes
+        return data[:len(data)-len(indexes)], np.array(final_labels), indexes
+        #形状の不一致のため実際にdataに値の入っている場所はdata[:len(data)-len(indexes)]の部分になる。
     
     def main1(self):
 
         word2id = dict( (c,i) for i,c in enumerate(sorted(self.labels_to_keep) ) )
-        print(self.all_data)
+        #print(self.all_data)
         label = self.all_data['label'].values
         label = [word2id[l] for l in label ]
-        one_hot_l = self.make_one_hot(label,12)
-        print(one_hot_l)
-        comp_data,l,indexes = self.paths_to_data(self.all_data['file'].values.tolist(), one_hot_l)
+        one_hot_l = self.make_one_hot(label,12)#これは全てのデータ
+        #print(one_hot_l)
+        comp_data,comp_label,indexes = self.paths_to_data(self.all_data['file'].values.tolist(), one_hot_l)
         print(comp_data.shape[0])#58252
-        print(len(l[0]))#12
-        comp_labels = np.zeros(shape = [comp_data.shape[0],len(l[0]) ])#(データ長さ,ラベル長が)
-        for i,array in enumerate(l):
-            for j,element in enumerate(array):
-                comp_labels[i][j] = element
-                
-        return comp_data,comp_labels
+        print(comp_data)
+        #comp_labels = np.zeros(shape = [comp_data.shape[0],len(l[0]) ])#(データ長さ,ラベル長が)
+        #for i,array in enumerate(l):
+        #    for j,element in enumerate(array):
+        #        comp_labels[i][j] = element
+        print(comp_label)
+        print(comp_data.shape)
+        print(comp_label.shape)
+        return comp_data,comp_label
 
 class machine_construction:
     def __init__(self,x_train,y_train):
@@ -219,13 +224,15 @@ class machine_construction:
         model.summary()
         model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
     
-    def call_fortran_rc(self,_in_node,_out_node,_rc_node,_traning_step,_rc_step):
+    def call_fortran_rc(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_traning_step,_rc_step):
         
-        self.x_train=self.x_train.(-1,ndim).T.copy()
+        
+        
+        self.x_train=self.x_train.reshape(-1,ndim).T.copy()
         #self.x_test =self.x_test .(-1,ndim).T.copy()
         self.y_train=self.y_train.T.copy().astype('float64')
         #self.y_test =self.y_test .T.copy().astype('float64')
-        self.Wout = Wout.T.copy().astype('float64')
+        Wout2 = Wout.T.copy().astype('float64')
 
         
         f = np.ctypeslib.load_library("rc_poseidon.so", ".")
@@ -235,24 +242,28 @@ class machine_construction:
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
             np.ctypeslib.ndpointer(dtype=np.float64),
             np.ctypeslib.ndpointer(dtype=np.float64),
             np.ctypeslib.ndpointer(dtype=np.float64),
-            np.ctypeslib.ndpointer(dtype=np.float64),
-            np.ctypeslib.ndpointer(dtype=np.float64),
+            #np.ctypeslib.ndpointer(dtype=np.float64),
+            #np.ctypeslib.ndpointer(dtype=np.float64),
             ]
         f.rc_poseidon_.restype = ctypes.c_void_p
     
         f_in_node = ctypes.byref(ctypes.c_int32(_in_node))
         f_out_node = ctypes.byref(ctypes.c_int32(_out_node))
         f_rc_node = ctypes.byref(ctypes.c_int32(_rc_node))
+        f_samp_num = ctypes.byref(ctypes.c_int32(_samp_num))
+        f_samp_step = ctypes.byref(ctypes.c_int32(_samp_step))
         f_traning_step = ctypes.byref(ctypes.c_int32(_traning_step))
         f_rc_step = ctypes.byref(ctypes.c_int32(_rc_step))
     
 #        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
 #                        self.x_train,self.y_train,self.x_test,self.y_test,Wout)
-        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
-                        self.x_train,self.y_train,Wout)
+        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_samp_num,f_samp_step,f_traning_step,f_rc_step,
+                        self.x_train,self.y_train,Wout2)
     
     
     def call_Keras_CNN(self):
@@ -284,11 +295,11 @@ if __name__ == '__main__':
     all_train_data , labels_to_keep = voice_d.load_files()
     train_data = all_train_data.loc[all_train_data['label'] != 'unkonwn']['file'].values #unknown以外格納
     cd=create_dataset(all_train_data,PATH_train)
-    data, one_hot_l = cd.main1()
+    data,one_hot_l = cd.main1()
     
     mc=machine_construction(data, one_hot_l)
-    mc.call_Keras_LSTM_a()
-    mc.call_fortran_rc(ndim,12,rc_node,data.shape[0]*data.shape[1],1000)
+#    mc.call_Keras_LSTM_a()
+    mc.call_fortran_rc(ndim,one_hot_l.shape[1],rc_node,data.shape[0],data.shape[1],data.shape[0]*data.shape[1],1000)
     
     
     

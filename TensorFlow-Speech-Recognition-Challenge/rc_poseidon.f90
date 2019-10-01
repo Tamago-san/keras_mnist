@@ -12,7 +12,7 @@ module cylinder
   real(8),parameter  :: Fu1_dble =0.1
   real(8),parameter  :: Fu2_dble =0.3
   real(8),parameter  :: Fu3_dble =0.5
-  integer, parameter :: OUT_NODE = 10
+  integer, parameter :: OUT_NODE = 12
   integer, parameter :: IN_NODE = 1
   integer, parameter :: TRANING_TIME_L =  5000 !5000time
   integer, parameter :: RC_TIME_L = 100        !100time
@@ -37,7 +37,7 @@ module cylinder
   integer(kind=4) :: iX1(NYmin:NYmax),iX2(NYmin:NYmax)
   integer(kind=4) :: iY1(NXmin:NXmax),iY2(NXmin:NXmax)
   integer(kind=4) :: iXb1,iXb2
-  integer(kind=4) :: istep,idtldtN,iRe_int
+  integer(kind=4) :: istep,idtldtN,iRe_int,isample
   integer(kind=4), parameter :: Ly_skip_step = 20000 !撹乱が定常、周期まで25000ステップ（250タイム）
   integer(kind=4), parameter :: skip_step = 20000 !定常，周期まで(200time)
   integer(kind=4), parameter :: Ly_out = 100 !リアプノフ指数の測定ステップ数500ステップ
@@ -654,13 +654,13 @@ function mean(a,time) result(out)
         enddo
         close(42)
     end subroutine output_Wout
-    subroutine mean_rirj(Vx,Vy,RiRj,RiSj,step)
+    subroutine mean_rirj(Vx,Vy,RiRj,RiSj,step,sample)
         real(kind=8) :: Vx(NXmin:NXmax,NYmin:NYmax)
         real(kind=8) :: Vy(NXmin:NXmax,NYmin:NYmax)
         real(8) RiRj(RC_NODE,RC_NODE)
 	    real(8) RiSj(RC_NODE,OUT_NODE)
 	    real(8) r_tmp(1:rc_node)
-        integer i,j,k,step
+        integer i,j,k,step,sample
         character filename*128
         
         call create_r_matrix(Vx,Vy,r_tmp,step)
@@ -698,16 +698,17 @@ function mean(a,time) result(out)
 end module cylinder
 !-----------------------------------------------------------------------------
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine rc_poseidon(in_node00,out_node00,rc_node00,traning_step00,rc_step00,&
-                    u_tr,s_tr,u_rc,s_rc_data,w_out0)
+subroutine rc_poseidon(in_node00,out_node00,rc_node00,samp_num00,samp_step00,traning_step00,rc_step00,&
+                    u_tr,s_tr,w_out0)
   use cylinder
     implicit none
     integer(4), intent(inout) :: in_node00,out_node00,rc_node00,traning_step00,rc_step00
+    integer(4), intent(inout) :: samp_num00,samp_step00
     real(8),    intent(inout) :: w_out0(rc_node00,out_node00)
     real(8),    intent(inout) ::u_tr(traning_step00,in_node00) !今は一次元、列サイズはトレーニング時間
-    real(8),    intent(inout) ::s_tr(traning_step00,out_node00)  !出力次元数、列サイズはトレーニング時間
-    real(8),    intent(inout) ::u_rc(rc_step00,in_node00) !今は一次元、列サイズはトレーニング時間
-    real(8),    intent(inout) ::s_rc_data(rc_step00,out_node00)  !出力次元数、列サイズはトレーニング時間
+    real(8),    intent(inout) ::s_tr(samp_num00,out_node00)  !出力次元数、列サイズはトレーニング時間
+!    real(8),    intent(inout) ::u_rc(rc_step00,in_node00) !今は一次元、列サイズはトレーニング時間
+!    real(8),    intent(inout) ::s_rc_data(rc_step00,out_node00)  !出力次元数、列サイズはトレーニング時間
     real(kind=8) :: R_tr(traning_step00,rc_node00)
 !    real(kind=8) :: W_out(rc_node00,out_node00)
 !    real(kind=8) :: U_tr (traning_step00,in_node00)
@@ -825,55 +826,56 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,traning_step00,rc_step00,&
         write(*,*) "     TRANING STEP"
         write(*,*) "=========================================="
             do istep=1,TRANING_STEP
+                isample=istep/samp_step00 +1
                 if (mod(istep,iout_display).eq.0) write(*,*) 'TRANING_step = ',istep
                 if (mod(istep,iout_display).eq.0) write(*,*) '    Re    = ',iRe_int
                 if (mod(istep,iout_display).eq.0) write(*,*) '    U     = ',U_tmp
                 if (mod(istep,iout_display).eq.0) write(*,*) "   TYO    = " ,TYO
                 if (mod(istep,iout_display).eq.0) write(*,200) '-------------    Vx(NXmax/2,0)=',Vx(NXmax/2,0)
                 U_data(1,1) = u_tr(istep,1)
-                do i=1,10
-                    S_data(1,i) = s_tr(istep,i)
+                do i=1,out_node
+                    S_data(1,i) = s_tr(isample,i)
                 enddo
                 !call DATA_standard(2)
                 call march(Vx,Vy,P,1)
-                if(call mean_rirj(Vx,Vy,RiRj,RiSj,istep)
+                call mean_rirj(Vx,Vy,RiRj,RiSj,iste,samplep,isample)
                 Vx_tmp(:,:) = Vx(:,:)
                 Vy_tmp(:,:) = Vy(:,:)
             enddo
             write(*,*) "=========================================="
             write(*,*) "     INVERSE MATRIX CALCULATION"
-            write(*,*) "=========================================="
+            write(*,*) "==================================,sample========"
     !        write(*,*) RiRj
             call create_Wout_matrix(RiRj,RiSj)
             call output_Wout
     !=================================================================================================================%%
-            write(*,*) "=========================================="
-            write(*,*) "     RC STEP"
-            write(*,*) "=========================================="
-            
-            write (filename, '("./data_RC_time_series_RE/RC_time_series_RE."i3.3 )') iRe_int
-            open(45,file=filename ,status='replace')
-    !        open(46,file='RC_err.dat',position='append')
-            do istep=1,rc_step00
-                if (mod(istep,iout_display).eq.0) write(*,*) 'RC_step = ',istep
-!                call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
-!                        DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),istep)
-                U_data(1,1) = u_tr(istep,1)
-                do i=1,10
-                    S_data(1,i) = s_tr(istep,i)
-                enddo
-!                call DATA_standard(2)
-                call march(Vx,Vy,P,2)
-                call RC_OWN(Vx,Vy,istep)
-                if(istep<=int(30.d0/dt_l) ) then
-                    if(mod(istep,ceiling(1.d0/(dt_l*1.d2) ) ) == 0) &
-                            write(45,"(11e14.3)") U_data(1,1),S_rc(1,1:OUT_NODE),S_data(1,1:OUT_NODE)
-                endif
-                Vx_tmp(:,:) = Vx(:,:)
-                Vy_tmp(:,:) = Vy(:,:)
-                call CAL_RC_ERR(RCerr)
-            enddo
-            close(45)
+!            write(*,*) "=========================================="
+!            write(*,*) "     RC STEP"
+!            write(*,*) "=========================================="
+!
+!            write (filename, '("./data_RC_time_series_RE/RC_time_series_RE."i3.3 )') iRe_int
+!            open(45,file=filename ,status='replace')
+!    !        open(46,file='RC_err.dat',position='append')
+!            do istep=1,rc_step00
+!                if (mod(istep,iout_display).eq.0) write(*,*) 'RC_step = ',istep
+!!                call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
+!!                        DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),istep)
+!                U_data(1,1) = u_tr(istep,1)
+!                do i=1,10
+!                    S_data(1,i) = s_tr(istep,i)
+!                enddo
+!!                call DATA_standard(2)
+!                call march(Vx,Vy,P,2)
+!                call RC_OWN(Vx,Vy,istep)
+!                if(istep<=int(30.d0/dt_l) ) then
+!                    if(mod(istep,ceiling(1.d0/(dt_l*1.d2) ) ) == 0) &
+!                            write(45,"(11e14.3)") U_data(1,1),S_rc(1,1:OUT_NODE),S_data(1,1:OUT_NODE)
+!                endif
+!                Vx_tmp(:,:) = Vx(:,:)
+!                Vy_tmp(:,:) = Vy(:,:)
+!                call CAL_RC_ERR(RCerr)
+!            enddo
+!            close(45)
     enddo
     enddo
 !    s_rc(:,:)=S_rc(:,:)/s_rc(1,1)
