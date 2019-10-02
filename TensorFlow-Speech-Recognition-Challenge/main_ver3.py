@@ -43,7 +43,7 @@ LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
 ndim = 1 #81#128#20
 nstep =32 #100#32#32
 epoch =20
-rc_node = 100
+rc_node = 611
 out_node =12
 Wout = np.empty((rc_node,out_node))
 
@@ -306,7 +306,9 @@ if __name__ == '__main__':
     
     mc=machine_construction(data, one_hot_l)
 #    mc.call_Keras_LSTM_a()
-    mc.call_fortran_rc(ndim,one_hot_l.shape[1],rc_node,data.shape[0],data.shape[1],data.shape[0]*data.shape[1],1000)
+    mc.call_fortran_rc(ndim,one_hot_l.shape[1],rc_node,data.shape[0],data.shape[1],
+                        int(data.shape[0]*data.shape[1]*0.8),int(data.shape[0]*data.shape[1]*0.2))
+#                     (in_node,_out_node,_rc_node,_samp_num,_samp_step,_traning_step,_rc_step):
     
     
     

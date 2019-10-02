@@ -58,7 +58,7 @@ module cylinder
 	integer,parameter :: Rvy_max = +10
 	integer,parameter :: tmpx = 1
 	integer,parameter :: tmpy = 1
-	integer,parameter :: RC_NODE = (Rvx_max-Rvx_min+1)*(Rvy_max-Rvy_min+1)-250
+	integer,parameter :: RC_NODE = (Rvx_max-Rvx_min+1)*(Rvy_max-Rvy_min+1)-250!611
 	integer,parameter :: heikouidou_x = -10
 	integer,parameter :: heikouidou_y = -10
 !-------------------------------------------------------
@@ -846,38 +846,39 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,samp_num00,samp_step00,tra
             enddo
             write(*,*) "=========================================="
             write(*,*) "     INVERSE MATRIX CALCULATION"
-            write(*,*) "==================================,sample========"
+            write(*,*) "=========================================="
     !        write(*,*) RiRj
             call create_Wout_matrix(RiRj,RiSj)
             call output_Wout
     !=================================================================================================================%%
-!            write(*,*) "=========================================="
-!            write(*,*) "     RC STEP"
-!            write(*,*) "=========================================="
-!
-!            write (filename, '("./data_RC_time_series_RE/RC_time_series_RE."i3.3 )') iRe_int
-!            open(45,file=filename ,status='replace')
-!    !        open(46,file='RC_err.dat',position='append')
-!            do istep=1,rc_step00
-!                if (mod(istep,iout_display).eq.0) write(*,*) 'RC_step = ',istep
-!!                call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
-!!                        DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),istep)
-!                U_data(1,1) = u_tr(istep,1)
-!                do i=1,10
-!                    S_data(1,i) = s_tr(istep,i)
-!                enddo
-!!                call DATA_standard(2)
-!                call march(Vx,Vy,P,2)
-!                call RC_OWN(Vx,Vy,istep)
-!                if(istep<=int(30.d0/dt_l) ) then
-!                    if(mod(istep,ceiling(1.d0/(dt_l*1.d2) ) ) == 0) &
-!                            write(45,"(11e14.3)") U_data(1,1),S_rc(1,1:OUT_NODE),S_data(1,1:OUT_NODE)
-!                endif
-!                Vx_tmp(:,:) = Vx(:,:)
-!                Vy_tmp(:,:) = Vy(:,:)
-!                call CAL_RC_ERR(RCerr)
-!            enddo
-!            close(45)
+            write(*,*) "=========================================="
+            write(*,*) "     RC STEP"
+            write(*,*) "=========================================="
+
+            write (filename, '("./data_RC_time_series_RE/RC_time_series_RE."i3.3 )') iRe_int
+            open(45,file=filename ,status='replace')
+    !        open(46,file='RC_err.dat',position='append')
+            do istep=1,rc_step00
+                isample=istep/samp_step00 +1
+                if (mod(istep,iout_display).eq.0) write(*,*) 'RC_step = ',istep
+!                call Runge_Kutta_method(DATA(BEFORE:Future3,1:3),&
+!                        DATA(Future3,1),DATA(Future3,2),DATA(Future3,3),istep)
+                U_data(1,1) = u_tr(istep,1)
+                do i=1,out_node
+                    S_data(1,i) = s_tr(isample,i)
+                enddo
+!                call DATA_standard(2)
+                call march(Vx,Vy,P,2)
+                call RC_OWN(Vx,Vy,istep)
+                if(istep<=int(30.d0/dt_l) ) then
+                    if(mod(istep,ceiling(1.d0/(dt_l*1.d2) ) ) == 0) &
+                            write(45,"(11e14.3)") U_data(1,1),S_rc(1,1:OUT_NODE),S_data(1,1:OUT_NODE)
+                endif
+                Vx_tmp(:,:) = Vx(:,:)
+                Vy_tmp(:,:) = Vy(:,:)
+                call CAL_RC_ERR(RCerr)
+            enddo
+            close(45)
     enddo
     enddo
 !    s_rc(:,:)=S_rc(:,:)/s_rc(1,1)
