@@ -227,19 +227,21 @@ class machine_construction:
     def call_fortran_rc(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_traning_step,_rc_step):
         
         
-        data_tmp = np.hstack(self.x_train,self.y_train)
+        data_tmp = np.hstack((self.x_train.reshape(-1,nstep),self.y_train))
         np.random.shuffle(data_tmp)
         #b[1:3, 2:4] # 1~2行目、2~3列目を抜き出す
-        x_tr = data_tmp[:int(data_tmp.shape(0)*0.8),0]
-        y_tr = data_tmp[:int(data_tmp.shape(0)*0.8),1:]
-        x_te = data_tmp[int(data_tmp.shape(0)*0.8):,0]
-        y_te = data_tmp[int(data_tmp.shape(0)*0.8):,1:]
+        x_tr = data_tmp[:int(data_tmp.shape[0]*0.8),0:ndim]
+        y_tr = data_tmp[:int(data_tmp.shape[0]*0.8),ndim:]
+        x_te = data_tmp[int(data_tmp.shape[0]*0.8):,0:ndim]
+        y_te = data_tmp[int(data_tmp.shape[0]*0.8):,ndim:]
         
         x_tr  =x_tr.reshape(-1,ndim).T.copy()
         x_te  =x_te.reshape(-1,ndim).T.copy()
         y_tr  =y_tr.T.copy().astype('float64')
         y_te  =y_te.T.copy().astype('float64')
         Wout2 = Wout.T.copy().astype('float64')
+        print(x_tr)
+        print(x_te)
 
         
         f = np.ctypeslib.load_library("rc_poseidon.so", ".")

@@ -838,8 +838,8 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,samp_num00,samp_step00,tra
                 enddo
                 !call DATA_standard(2)
                 call march(Vx,Vy,P,1)
-                call mean_rirj(Vx,Vy,RiRj,RiSj,iste,samplep,isample)
-                if(mod(istep,sample_step00)==0) then
+                call mean_rirj(Vx,Vy,RiRj,RiSj,istep,isample)
+                if(mod(istep,samp_step00)==0) then
                     Vx(:,:) = Vx_tmp(:,:)
                     Vy(:,:) = Vy_tmp(:,:)
                 endif
