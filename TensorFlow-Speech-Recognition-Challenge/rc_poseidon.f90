@@ -527,7 +527,7 @@ function mean(a,time) result(out)
 !        		enddo
 !        	enddo
     		RiRj(1:RC_NODE,1:RC_NODE)=RiRj(1:RC_NODE,1:RC_NODE)+beta*e(1:RC_NODE,1:RC_NODE)
-!            write(*,*) RiRj
+            write(*,*) RiRj
 !tmp_2はRC_NODE行OUT_NODE列の行列
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 !逆行列作成++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -539,6 +539,7 @@ function mean(a,time) result(out)
 !逆行列確かめ++++++++++++++++++++++++++++++++++++++++++++++++++
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     	    inverse=0.d0
+            write(*,*) RiRj
     	    do i=1,RC_NODE
     	    	do j=1,RC_NODE
     	    		do k=1,RC_NODE
@@ -757,10 +758,10 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,samp_num00,samp_step00,tra
 !=================================================================================================================
     
 
-    !OUT_NODE = out_node00
-    !IN_NODE = in_node00
-    !TRANING_STEP = traning_step00
-    !RC_STEP = rc_step00
+    OUT_NODE = out_node00
+    IN_NODE = in_node00
+    TRANING_STEP = traning_step00
+    RC_STEP = rc_step00
     
     write(*,*) "+++++++++++++++++++++++++++++++"
     write(*,*) "==============================="
@@ -825,7 +826,7 @@ subroutine rc_poseidon(in_node00,out_node00,rc_node00,samp_num00,samp_step00,tra
         write(*,*) "=========================================="
         write(*,*) "     TRANING STEP"
         write(*,*) "=========================================="
-            do istep=1,TRANING_STEP
+            do istep=1,traning_step00
                 isample=istep/samp_step00 +1
                 if (mod(istep,iout_display).eq.0) write(*,*) 'TRANING_step = ',istep
                 if (mod(istep,iout_display).eq.0) write(*,*) '    Re    = ',iRe_int

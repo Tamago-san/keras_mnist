@@ -25,6 +25,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import MinMaxScaler
 import sklearn
 import warnings
+import scipy.stats
+
 warnings.filterwarnings('ignore')
 
 
@@ -43,11 +45,17 @@ LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
 ndim = 1 #81#128#20
 nstep =32 #100#32#32
 epoch =20
-rc_node = 611
+#rc_node = 611
+rc_node = 100
 out_node =12
 Wout = np.empty((rc_node,out_node))
 
-
+def min_max(x, axis=None):
+    min = x.min(axis=axis, keepdims=True)
+    max = x.max(axis=axis, keepdims=True)
+    result = (x-min)/(max-min)
+    return result
+    
 class data_load:
     def __init__(self,path):
         self.path=path
@@ -87,7 +95,8 @@ class data_load:
         
 class create_dataset:
     def __init__(self,data,path):
-        self.all_data = data
+        data = data.sample(frac=1).reset_index(drop=True)
+        self.all_data = data[:1000]
         self.path=path
         self.labels_to_keep = LABELS_TO_KEEP
         self.input_step = 0
@@ -188,7 +197,7 @@ class create_dataset:
 
 class machine_construction:
     def __init__(self,x_train,y_train):
-        self.x_train = x_train
+        self.x_train = min_max(x_train, axis=1)
         self.y_train = y_train
     
     def call_Keras_LSTM_a(self):
@@ -224,16 +233,19 @@ class machine_construction:
         model.summary()
         model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
     
-    def call_fortran_rc(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_traning_step,_rc_step):
+    def call_fortran_poseidon(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_all_step):
         
         
         data_tmp = np.hstack((self.x_train.reshape(-1,nstep),self.y_train))
         np.random.shuffle(data_tmp)
         #b[1:3, 2:4] # 1~2行目、2~3列目を抜き出す
-        x_tr = data_tmp[:int(data_tmp.shape[0]*0.8),0:ndim]
-        y_tr = data_tmp[:int(data_tmp.shape[0]*0.8),ndim:]
-        x_te = data_tmp[int(data_tmp.shape[0]*0.8):,0:ndim]
-        y_te = data_tmp[int(data_tmp.shape[0]*0.8):,ndim:]
+        _traning_step = int(_all_step)
+        print(_traning_step)
+        _rc_step = int(_all_step*0.2)
+        x_tr = data_tmp[:_traning_step,0:ndim]
+        y_tr = data_tmp[:_traning_step,ndim:]
+        x_te = data_tmp[_traning_step:_rc_step,0:ndim]
+        y_te = data_tmp[_traning_step:_rc_step,ndim:]
         
         x_tr  =x_tr.reshape(-1,ndim).T.copy()
         x_te  =x_te.reshape(-1,ndim).T.copy()
@@ -273,6 +285,60 @@ class machine_construction:
 #                        self.x_train,self.y_train,self.x_test,self.y_test,Wout)
         f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_samp_num,f_samp_step,f_traning_step,f_rc_step,
                         x_tr,y_tr,x_te,y_te,Wout2)
+        
+    def call_fortran_tanh(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_all_step):
+        
+        
+        data_tmp = np.hstack((self.x_train.reshape(-1,nstep),self.y_train))
+        np.random.shuffle(data_tmp)
+
+        #b[1:3, 2:4] # 1~2行目、2~3列目を抜き出す
+        _traning_step = nstep* int(_samp_num*0.02)
+        _rc_step = nstep* int(_samp_num*0.01)
+        x_tr = data_tmp[:_traning_step,0:ndim]
+        y_tr = data_tmp[:_traning_step,ndim:]
+        x_te = data_tmp[_traning_step:_rc_step,0:ndim]
+        y_te = data_tmp[_traning_step:_rc_step,ndim:]
+        
+        x_tr  =x_tr.reshape(-1,ndim).T.copy()
+        x_te  =x_te.reshape(-1,ndim).T.copy()
+        y_tr  =y_tr.T.copy().astype('float64')
+        y_te  =y_te.T.copy().astype('float64')
+        Wout2 = Wout.T.copy().astype('float64')
+        print(x_tr)
+        print(x_te)
+        np.savetxt('np_savetxt.txt', x_tr,fmt='%.3e')
+
+        
+        f = np.ctypeslib.load_library("rc_tanh.so", ".")
+        f.rc_tanh_.argtypes = [
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            np.ctypeslib.ndpointer(dtype=np.float64),
+            np.ctypeslib.ndpointer(dtype=np.float64),
+            np.ctypeslib.ndpointer(dtype=np.float64),
+            np.ctypeslib.ndpointer(dtype=np.float64),
+            np.ctypeslib.ndpointer(dtype=np.float64),
+            ]
+        f.rc_tanh_.restype = ctypes.c_void_p
+    
+        f_in_node = ctypes.byref(ctypes.c_int32(_in_node))
+        f_out_node = ctypes.byref(ctypes.c_int32(_out_node))
+        f_rc_node = ctypes.byref(ctypes.c_int32(_rc_node))
+        f_samp_num = ctypes.byref(ctypes.c_int32(_samp_num))
+        f_samp_step = ctypes.byref(ctypes.c_int32(_samp_step))
+        f_traning_step = ctypes.byref(ctypes.c_int32(_traning_step))
+        f_rc_step = ctypes.byref(ctypes.c_int32(_rc_step))
+    
+#        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
+#                        self.x_train,self.y_train,self.x_test,self.y_test,Wout)
+        f.rc_tanh_(f_in_node,f_out_node,f_rc_node,f_samp_num,f_samp_step,f_traning_step,f_rc_step,
+                        x_tr,y_tr,x_te,y_te,Wout2)
     
     
     def call_Keras_CNN(self):
@@ -308,8 +374,11 @@ if __name__ == '__main__':
     
     mc=machine_construction(data, one_hot_l)
 #    mc.call_Keras_LSTM_a()
-    mc.call_fortran_rc(ndim,one_hot_l.shape[1],rc_node,data.shape[0],data.shape[1],
-                        int(data.shape[0]*data.shape[1]*0.8),int(data.shape[0]*data.shape[1]*0.2))
+#    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],data.shape[1],
+#                        int(data.shape[0]*data.shape[1]))
+    print(data.shape)
+    mc.call_fortran_tanh(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
+                        int(data.shape[0]*nstep))
 #                     (in_node,_out_node,_rc_node,_samp_num,_samp_step,_traning_step,_rc_step):
     
     
