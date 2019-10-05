@@ -46,7 +46,7 @@ ndim = 1 #81#128#20
 nstep =32 #100#32#32
 epoch =20
 #rc_node = 611
-rc_node = 100
+rc_node = 10
 out_node =12
 Wout = np.empty((rc_node,out_node))
 

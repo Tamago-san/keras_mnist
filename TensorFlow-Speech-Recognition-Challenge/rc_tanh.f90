@@ -18,7 +18,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
     real(8) s_rc(rc_step,out_node)  !出力次元数、列サイズはトレーニング時間
     
     real(8)     w_in(in_node,rc_node)
-    real(8)     W_rc(rc_node,rc_node)
+    real(8)     w_rc(rc_node,rc_node)
     
     real(8)     r_bef(rc_node)
     real(8)     r_now(rc_node)
@@ -46,6 +46,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
 !=======================================
     r_max=0.d0
     r_ave=0.d0
+    r_bef = 0.d0
     alpha = 0.9d0
     g = 1.d0
     gusai = 0.001d0
@@ -55,7 +56,8 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
         w_rc(i,j)=rand_normal(0.d0, 1.d0/(rc_node**0.5d0))
     enddo
     enddo
-!    write(*,*) a(1:rc_node,1:rc_node)
+    !write(*,*) w_rc(1:rc_node,1:rc_node)
+    
     do i=1,in_node
     do j=1,rc_node
         w_in(i,j)=rand_normal(0.d0, 1.d0/(rc_node**0.5d0))
@@ -206,8 +208,9 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
                     wu = wu + u_tmp(1,j2)*w_in(j2,j1)
                 enddo
                 r_tm(j1) =  (1-alpha)*r_bef(j1) + alpha*tanh(g*(wu+ar+gusai))
+                !write(*,*) r_bef
             enddo
-            r_bef = r_now
+            r_bef = r_tm
         end subroutine create_r_matrix
         subroutine create_Wout_matrix(RiRj,RiSj)
             integer i,j,k
@@ -227,7 +230,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
         !---------------------------------
             tmp_3 = 0.d0
         	RiRj(1:rc_node,1:rc_node)=RiRj(1:rc_node,1:rc_node)+beta*e(1:rc_node,1:rc_node)
-    !            write(*,*) RiRj
+                write(*,*) RiRj
     !tmp_2はRC_NODE行OUT_NODE列の行列
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     !逆行列作成++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -235,6 +238,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
             tmp_3=RiRj
         	call dgetrf(rc_node, rc_node, RiRj, rc_node, ipiv, info)
         	call dgetri(rc_node,RiRj, rc_node, ipiv, work, lwork, info)
+     !           write(*,*) RiRj
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     !逆行列確かめ++++++++++++++++++++++++++++++++++++++++++++++++++
     !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
