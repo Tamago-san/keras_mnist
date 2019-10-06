@@ -5,17 +5,19 @@
 !gfortran -shared -o rc_tanh.so rc_tanh.f90 -llapack -fPIC
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_step,&
+subroutine rc_tanh(in_node,out_node,rc_node,&
+                    samp_num,traning_num,rc_num,samp_step,traning_step,rc_step,&
                     u_tr,s_tr,u_rc,s_rc_data,w_out)
     implicit none
-    integer(4), intent(inout) :: in_node,out_node,rc_node,traning_step,rc_step
+    integer(4), intent(inout) :: in_node,out_node,rc_node
+    integer(4), intent(inout) :: traning_num,rc_num,traning_step,rc_step
     integer(4), intent(inout) :: samp_num,samp_step
     real(8),    intent(inout) :: w_out(rc_node,out_node)
     real(8),    intent(inout) ::u_tr(traning_step,in_node) !今は一次元、列サイズはトレーニング時間
-    real(8),    intent(inout) ::s_tr(samp_num,out_node)  !出力次元数、列サイズはトレーニング時間
+    real(8),    intent(inout) ::s_tr(traning_num,out_node)  !出力次元数、列サイズはトレーニング時間
     real(8),    intent(inout) ::u_rc(rc_step,in_node) !今は一次元、列サイズはトレーニング時間
-    real(8),    intent(inout) ::s_rc_data(rc_step,out_node)  !出力次元数、列サイズはトレーニング時間
-    real(8) s_rc(rc_step,out_node)  !出力次元数、列サイズはトレーニング時間
+    real(8),    intent(inout) ::s_rc_data(rc_num,out_node)  !出力次元数、列サイズはトレーニング時間
+    real(8) s_rc(rc_num,out_node)  !出力次元数、列サイズはトレーニング時間
     
     real(8)     w_in(in_node,rc_node)
     real(8)     W_rc(rc_node,rc_node)
@@ -34,9 +36,9 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
     real(8)     e(rc_node,rc_node)
     real(8)     inverse(rc_node,rc_node)
     real(8)     beta,p,av_degree
-    real(8)     r_ave,r_max
+    real(8)     r_ave,r_max,acc
     real(8)  alpha,g,gusai,NU
-    integer(4)  i,j ,k,f,istep,isample
+    integer(4)  i,j ,k,f,istep,isample,result_data(1),result_rc(1)
     real(8) :: PI=3.14159265358979
 !!!!!!!!lapack!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!lapack!!!!!!!!!!!!!!!!!!!!
@@ -68,17 +70,13 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
     u_tmp = 0.d0
     s_tmp = 0.d0
     r_now=  0.d0
+    r_bef=1.d0
     w_out=0.d0
     beta=1.d-5
     e=0.d0
     do i=1,rc_node
         e(i,i)=1.d0
     enddo
-    open(54,file='output_traning1.dat', status='replace')
-    do i=1,traning_step
-        write(54,"(13e14.3)") u_tr(i,1:in_node),s_tr(i,1:out_node)
-    enddo
-    close(54)
     write(*,*) "+++++++++++++++++++++++++++++++"
     write(*,*) "==============================="
     write(*,*) "    welcome to  Fortran90 !    "
@@ -97,20 +95,29 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
     write(*,*) "==============================="
     write(*,*) "+++++++++++++++++++++++++++++++"
     write(*,*) ""
-
+    open(54,file='./data_out/output_traning_u.dat', status='replace')
+    open(55,file='./data_out/output_traning_s.dat', status='replace')
 !rはtraning_time行rc_node列の正方行列
     do istep=1,traning_step
         isample=istep/samp_step +1
-        if (mod(istep,100).eq.0) write(*,*) 'TRANING_step = ',istep
+        !write(*,*) isample
+        if (mod(istep,5000).eq.0) &
+            write(*,*) 'TRANING_step = ',istep,int(dble(istep)*100.d0/dble(traning_step)),"%"
         do i=1,in_node
             u_tmp(1,i) = u_tr(istep,i)
         enddo
         do i=1,out_node
             s_tmp(1,i) = s_tr(isample,i)
+            !if(s_tmp(1,i)<1.d-10) s_tmp(1,i) =0.d0
         enddo
+        write(54,"(1e14.3)") u_tmp(1,1:in_node)
+        write(55,"(13e14.3)") dble(isample),s_tmp(1,1:out_node)
+        call create_r_matrix
+        !if(mod(istep,samp_step)==0) call mean_rirj(RiRj,RiSj,istep,isample)
         call mean_rirj(RiRj,RiSj,istep,isample)
     enddo
-            
+    close(54)
+    close(55)
     write(*,*) "=========================================="
     write(*,*) "     INVERSE MATRIX CALCULATION"
     write(*,*) "=========================================="
@@ -134,20 +141,45 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
 	do istep=1,rc_step
 	    isample=istep/samp_step +1
 	    do i=1,in_node
-            u_tmp(1,i) = u_tr(istep,i)
+            u_tmp(1,i) = u_rc(istep,i)
         enddo
         do i=1,out_node
-            s_tmp(1,i) = s_tr(isample,i)
+            s_tmp(1,i) = s_rc(isample,i)
         enddo
-        call create_r_matrix(r_now)
+        call create_r_matrix
         
         s_rc(isample,:)=0.d0
         do j=1,out_node
         do i=1,rc_node
-            s_rc(isample,j) = S_rc(isample,j) + r_now(i)*W_out(i,j)
+            s_rc(isample,j) = s_rc(isample,j) + r_now(i)*W_out(i,j)
         enddo
         enddo
+        
     enddo
+    open(56,file='./data_out/output_rc_s.dat', status='replace')
+    do isample=1,rc_num
+        write(56,"(13e14.3)") s_rc(isample,1:out_node),dble(MAXLOC(s_rc(isample,1:out_node)))
+    enddo
+    close(56)
+    open(56,file='./data_out/output_rc_s_data.dat', status='replace')
+    acc = 0.d0
+    do isample=1,rc_num
+        write(56,*) MAXLOC(s_rc(isample,1:out_node)),MAXLOC(s_rc_data(isample,1:out_node))
+    enddo
+    
+
+    do isample=1,rc_num
+        result_rc  =MAXLOC(s_rc(isample,1:out_node))
+        result_data=MAXLOC(s_rc_data(isample,1:out_node))
+        write(56,*) result_rc,result_data
+        if(result_rc(1)==result_data(1)) then
+            acc = acc + 1.d0
+        endif
+    enddo
+    close(56)
+    write(*,*) "=========================================="
+    write(*,*) "     RC ACC >>>>>",acc/dble(rc_num) *100.d0,'%'
+    write(*,*) "=========================================="
     
     contains
         function rand_normal(mu,sigma)
@@ -167,12 +199,12 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
             integer i,j,k,step,sample
             character filename*128
             
-            call create_r_matrix(r_now)
+            
             do i=1,rc_node
             do j=1,rc_node
     	        !RiRj(i,j) = (RiRj(i,j)*dble(step-1) + r_now(i)*r_now(j) )/dble(step)
             	RiRj(i,j) = RiRj(i,j)+r_now(i)*r_now(j)
-                if(abs(RiRj(i,j))<1.d-5) RiRj(i,j)=0.d0
+                !if(abs(RiRj(i,j))<1.d-5) RiRj(i,j)=0.d0
             enddo
             enddo
     !tmp_2はRC_NODE行OUT_NODE列の行列
@@ -180,7 +212,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
     	    do i=1,rc_node
 !                RiSj(i,j) = (RiSj(i,j)*dble(step-1) + r_now(i)*s_tmp(1,j))/dble(step)
     	    	RiSj(i,j) = RiSj(i,j) + r_now(i)*s_tmp(1,j)
-                if(abs(RiSj(i,j))<1.d-5) RiSj(i,j)=0.d0
+                !if(abs(RiSj(i,j))<1.d-5) RiSj(i,j)=0.d0
     	    enddo
     	    enddo
     !	    write (filename, '("./data_traning_rirj/rirj_RE."i3.3 )') iRe_int
@@ -191,21 +223,22 @@ subroutine rc_tanh(in_node,out_node,rc_node,samp_num,samp_step,traning_step,rc_s
     !!        enddo
     !        close(42)
         end subroutine mean_rirj
-        subroutine create_r_matrix(r_tm)
-            real(kind=8) :: r_tm(1:rc_node)
+        subroutine create_r_matrix
+!            real(kind=8) :: r_tm(1:rc_node)
             real(8) wu,ar
             integer j1,j2
-            r_tm = 0.d0
+            r_now = 0.d0
             do j1=1,rc_node
                 ar =0.d0
                 wu=0.d0
                 do j2= 1,rc_node
                     ar = ar + r_bef(j2)*w_rc(j2,j1)
+                    !write(*,*) r_bef(j2)
                 enddo
                 do j2=1,in_node
                     wu = wu + u_tmp(1,j2)*w_in(j2,j1)
                 enddo
-                r_tm(j1) =  (1-alpha)*r_bef(j1) + alpha*tanh(g*(wu+ar+gusai))
+                r_now(j1) =  (1-alpha)*r_bef(j1) + alpha*tanh(g*(wu+ar+gusai))
             enddo
             r_bef = r_now
         end subroutine create_r_matrix

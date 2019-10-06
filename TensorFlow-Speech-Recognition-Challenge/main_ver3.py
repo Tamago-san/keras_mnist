@@ -42,11 +42,12 @@ PATH_train = './data/train/audio/'
 PATH_test =  './data/test/audio/'
 LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
 
+all_sample_num = 10000
 ndim = 1 #81#128#20
 nstep =32 #100#32#32
 epoch =20
-#rc_node = 611
-rc_node = 100
+rc_node = 611
+#rc_node = 200
 out_node =12
 Wout = np.empty((rc_node,out_node))
 
@@ -96,7 +97,8 @@ class data_load:
 class create_dataset:
     def __init__(self,data,path):
         data = data.sample(frac=1).reset_index(drop=True)
-        self.all_data = data[:1000]
+        self.all_data = data[:all_sample_num]
+#        self.all_data = data
         self.path=path
         self.labels_to_keep = LABELS_TO_KEEP
         self.input_step = 0
@@ -235,29 +237,61 @@ class machine_construction:
     
     def call_fortran_poseidon(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_all_step):
         
+        y_tmp1 = self.y_train.reshape(self.y_train.shape[0],self.y_train.shape[1],1)
+        y_tmp2 = y_tmp1
+        for k in range(ndim-1):
+            y_tmp2 = np.concatenate([y_tmp2,y_tmp1],axis = -1)
+        data_tmp = np.concatenate([self.x_train,y_tmp2],axis = 1)
+        data_tmp[np.isnan(data_tmp)] = 0.00000001
         
-        data_tmp = np.hstack((self.x_train.reshape(-1,nstep),self.y_train))
-        np.random.shuffle(data_tmp)
+        #np.savetxt('./data_out/np_savetxt_data_tmp.txt', data_tmp,fmt='%.3e')
+        #data_tmp[np.isnan(data_tmp)] = np.nanmean(data_tmp)
+        #np.random.shuffle(data_tmp)
+        print(data_tmp.shape)
+
         #b[1:3, 2:4] # 1~2行目、2~3列目を抜き出す
-        _traning_step = int(_all_step)
-        print(_traning_step)
-        _rc_step = int(_all_step*0.2)
-        x_tr = data_tmp[:_traning_step,0:ndim]
-        y_tr = data_tmp[:_traning_step,ndim:]
-        x_te = data_tmp[_traning_step:_rc_step,0:ndim]
-        y_te = data_tmp[_traning_step:_rc_step,ndim:]
+        #1元のみ
+        _traning_num =int(_samp_num*0.8)
+        _rc_num = int(_samp_num*0.2)
+        _traning_step = nstep* _traning_num
+        _rc_step = nstep* _rc_num
+        x_tr = data_tmp[:_traning_num,0:nstep,0:ndim]
+        y_tr = data_tmp[:_traning_num,nstep:,0]
+        x_te = data_tmp[_traning_num:_traning_num+_rc_num,0:nstep,0:ndim]
+        y_te = data_tmp[_traning_num:_traning_num+_rc_num,nstep:,0]
         
-        x_tr  =x_tr.reshape(-1,ndim).T.copy()
-        x_te  =x_te.reshape(-1,ndim).T.copy()
+        x_tr  =x_tr.reshape(-1,ndim)
+        x_te  =x_te.reshape(-1,ndim)
+        y_tr  =y_tr.reshape(-1,out_node)
+        y_te  =y_te.reshape(-1,out_node)
+#        np.savetxt('./data_out/np_savetxt_u.txt', x_tr,fmt='%.3e')
+#        np.savetxt('./data_out/np_savetxt_s.txt', y_tr,fmt='%.3e')
+        print('okuru data ====================x_tr')
+        print(x_tr)
+        print('okuru data ====================x_te')
+        print(x_te)
+        print('okuru data ====================y_tr')
+        print(y_tr)
+        print('okuru data ====================y_te')
+        print(y_te)
+        x_tr  =x_tr.T.copy().astype('float64')
+        x_te  =x_te.T.copy().astype('float64')
         y_tr  =y_tr.T.copy().astype('float64')
         y_te  =y_te.T.copy().astype('float64')
         Wout2 = Wout.T.copy().astype('float64')
-        print(x_tr)
-        print(x_te)
+        np.savetxt('./data_out/np_savetxt_u.txt', x_tr.T,fmt='%.3e')
+        np.savetxt('./data_out/np_savetxt_s.txt', y_tr.T,fmt='%.3e')
 
+
+        print(x_tr.shape)
+        print(y_tr.shape)
+        print(x_te.shape)
+        print(y_te.shape)
         
         f = np.ctypeslib.load_library("rc_poseidon.so", ".")
         f.rc_poseidon_.argtypes = [
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
@@ -277,41 +311,78 @@ class machine_construction:
         f_out_node = ctypes.byref(ctypes.c_int32(_out_node))
         f_rc_node = ctypes.byref(ctypes.c_int32(_rc_node))
         f_samp_num = ctypes.byref(ctypes.c_int32(_samp_num))
+        f_traning_num = ctypes.byref(ctypes.c_int32(_traning_num))
+        f_rc_num = ctypes.byref(ctypes.c_int32(_rc_num))
         f_samp_step = ctypes.byref(ctypes.c_int32(_samp_step))
         f_traning_step = ctypes.byref(ctypes.c_int32(_traning_step))
         f_rc_step = ctypes.byref(ctypes.c_int32(_rc_step))
     
 #        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
 #                        self.x_train,self.y_train,self.x_test,self.y_test,Wout)
-        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_samp_num,f_samp_step,f_traning_step,f_rc_step,
+        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,
+                    f_samp_num,f_traning_num,f_rc_num,f_samp_step,f_traning_step,f_rc_step,
                         x_tr,y_tr,x_te,y_te,Wout2)
         
     def call_fortran_tanh(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_all_step):
         
         
-        data_tmp = np.hstack((self.x_train.reshape(-1,nstep),self.y_train))
-        np.random.shuffle(data_tmp)
+        y_tmp1 = self.y_train.reshape(self.y_train.shape[0],self.y_train.shape[1],1)
+        y_tmp2 = y_tmp1
+        for k in range(ndim-1):
+            y_tmp2 = np.concatenate([y_tmp2,y_tmp1],axis = -1)
+        data_tmp = np.concatenate([self.x_train,y_tmp2],axis = 1)
+        data_tmp[np.isnan(data_tmp)] = 0.00000001
+        
+        #np.savetxt('./data_out/np_savetxt_data_tmp.txt', data_tmp,fmt='%.3e')
+        #data_tmp[np.isnan(data_tmp)] = np.nanmean(data_tmp)
+        #np.random.shuffle(data_tmp)
+        print(data_tmp.shape)
 
         #b[1:3, 2:4] # 1~2行目、2~3列目を抜き出す
-        _traning_step = nstep* int(_samp_num*0.02)
-        _rc_step = nstep* int(_samp_num*0.01)
-        x_tr = data_tmp[:_traning_step,0:ndim]
-        y_tr = data_tmp[:_traning_step,ndim:]
-        x_te = data_tmp[_traning_step:_rc_step,0:ndim]
-        y_te = data_tmp[_traning_step:_rc_step,ndim:]
+        #1元のみ
+        _traning_num =int(_samp_num*0.8)
+        _rc_num = int(_samp_num*0.2)
+        _traning_step = nstep* _traning_num
+        _rc_step = nstep* _rc_num
+        x_tr = data_tmp[:_traning_num,0:nstep,0:ndim]
+        y_tr = data_tmp[:_traning_num,nstep:,0]
+        x_te = data_tmp[_traning_num:_traning_num+_rc_num,0:nstep,0:ndim]
+        y_te = data_tmp[_traning_num:_traning_num+_rc_num,nstep:,0]
         
-        x_tr  =x_tr.reshape(-1,ndim).T.copy()
-        x_te  =x_te.reshape(-1,ndim).T.copy()
+        x_tr  =x_tr.reshape(-1,ndim)
+        x_te  =x_te.reshape(-1,ndim)
+        y_tr  =y_tr.reshape(-1,out_node)
+        y_te  =y_te.reshape(-1,out_node)
+#        np.savetxt('./data_out/np_savetxt_u.txt', x_tr,fmt='%.3e')
+#        np.savetxt('./data_out/np_savetxt_s.txt', y_tr,fmt='%.3e')
+        print('okuru data ====================x_tr')
+        print(x_tr)
+        print('okuru data ====================x_te')
+        print(x_te)
+        print('okuru data ====================y_tr')
+        print(y_tr)
+        print('okuru data ====================y_te')
+        print(y_te)
+        x_tr  =x_tr.T.copy().astype('float64')
+        x_te  =x_te.T.copy().astype('float64')
         y_tr  =y_tr.T.copy().astype('float64')
         y_te  =y_te.T.copy().astype('float64')
         Wout2 = Wout.T.copy().astype('float64')
-        print(x_tr)
-        print(x_te)
-        np.savetxt('np_savetxt.txt', x_tr,fmt='%.3e')
+        np.savetxt('./data_out/np_savetxt_u.txt', x_tr.T,fmt='%.3e')
+        np.savetxt('./data_out/np_savetxt_s.txt', y_tr.T,fmt='%.3e')
+
+
+        print(x_tr.shape)
+        print(y_tr.shape)
+        print(x_te.shape)
+        print(y_te.shape)
+        
 
         
         f = np.ctypeslib.load_library("rc_tanh.so", ".")
         f.rc_tanh_.argtypes = [
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
@@ -331,13 +402,16 @@ class machine_construction:
         f_out_node = ctypes.byref(ctypes.c_int32(_out_node))
         f_rc_node = ctypes.byref(ctypes.c_int32(_rc_node))
         f_samp_num = ctypes.byref(ctypes.c_int32(_samp_num))
+        f_traning_num = ctypes.byref(ctypes.c_int32(_traning_num))
+        f_rc_num = ctypes.byref(ctypes.c_int32(_rc_num))
         f_samp_step = ctypes.byref(ctypes.c_int32(_samp_step))
         f_traning_step = ctypes.byref(ctypes.c_int32(_traning_step))
         f_rc_step = ctypes.byref(ctypes.c_int32(_rc_step))
     
 #        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
 #                        self.x_train,self.y_train,self.x_test,self.y_test,Wout)
-        f.rc_tanh_(f_in_node,f_out_node,f_rc_node,f_samp_num,f_samp_step,f_traning_step,f_rc_step,
+        f.rc_tanh_(f_in_node,f_out_node,f_rc_node,
+                    f_samp_num,f_traning_num,f_rc_num,f_samp_step,f_traning_step,f_rc_step,
                         x_tr,y_tr,x_te,y_te,Wout2)
     
     
@@ -373,12 +447,12 @@ if __name__ == '__main__':
     data,one_hot_l = cd.main1()
     
     mc=machine_construction(data, one_hot_l)
-#    mc.call_Keras_LSTM_a()
-#    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],data.shape[1],
-#                        int(data.shape[0]*data.shape[1]))
     print(data.shape)
-    mc.call_fortran_tanh(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
+#    mc.call_Keras_LSTM_a()
+    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
                         int(data.shape[0]*nstep))
+#    mc.call_fortran_tanh(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
+#                        int(data.shape[0]*nstep))
 #                     (in_node,_out_node,_rc_node,_samp_num,_samp_step,_traning_step,_rc_step):
     
     
