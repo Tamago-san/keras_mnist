@@ -42,12 +42,12 @@ PATH_train = './data/train/audio/'
 PATH_test =  './data/test/audio/'
 LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
 
-all_sample_num = 10000
-ndim = 1 #81#128#20
+all_sample_num = 2500
+ndim = 8 #81#128#20
 nstep =32 #100#32#32
 epoch =20
-rc_node = 611
-#rc_node = 200
+#rc_node = 611
+rc_node = 100
 out_node =12
 Wout = np.empty((rc_node,out_node))
 
@@ -141,6 +141,7 @@ class create_dataset:
         #print("完成の次元")
         #print(mfccs.shape)#(128, 32)(次元,時間)
         mfccs = sklearn.preprocessing.scale(mfccs, axis=1)
+        #mfccs =sklearn.preprocessing.minmax_scale(mfccs,axis=1)
         
         return mfccs.T#(時間,次元)で返す
 
@@ -199,7 +200,8 @@ class create_dataset:
 
 class machine_construction:
     def __init__(self,x_train,y_train):
-        self.x_train = min_max(x_train, axis=1)
+#        self.x_train = min_max(x_train, axis=1)
+        self.x_train = x_train
         self.y_train = y_train
     
     def call_Keras_LSTM_a(self):
@@ -241,7 +243,7 @@ class machine_construction:
         y_tmp2 = y_tmp1
         for k in range(ndim-1):
             y_tmp2 = np.concatenate([y_tmp2,y_tmp1],axis = -1)
-        data_tmp = np.concatenate([self.x_train,y_tmp2],axis = 1)
+        data_tmp = np.concatenate([min_max(self.x_train, axis=1),y_tmp2],axis = 1)
         data_tmp[np.isnan(data_tmp)] = 0.00000001
         
         #np.savetxt('./data_out/np_savetxt_data_tmp.txt', data_tmp,fmt='%.3e')
@@ -330,7 +332,7 @@ class machine_construction:
         y_tmp2 = y_tmp1
         for k in range(ndim-1):
             y_tmp2 = np.concatenate([y_tmp2,y_tmp1],axis = -1)
-        data_tmp = np.concatenate([self.x_train,y_tmp2],axis = 1)
+        data_tmp = np.concatenate([min_max(self.x_train, axis=1),y_tmp2],axis = 1)
         data_tmp[np.isnan(data_tmp)] = 0.00000001
         
         #np.savetxt('./data_out/np_savetxt_data_tmp.txt', data_tmp,fmt='%.3e')
@@ -449,11 +451,10 @@ if __name__ == '__main__':
     mc=machine_construction(data, one_hot_l)
     print(data.shape)
 #    mc.call_Keras_LSTM_a()
-    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
-                        int(data.shape[0]*nstep))
-#    mc.call_fortran_tanh(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
+#    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
 #                        int(data.shape[0]*nstep))
-#                     (in_node,_out_node,_rc_node,_samp_num,_samp_step,_traning_step,_rc_step):
+    mc.call_fortran_tanh(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
+                        int(data.shape[0]*nstep))
     
     
     

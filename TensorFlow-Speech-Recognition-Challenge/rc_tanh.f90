@@ -49,7 +49,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
     r_max=0.d0
     r_ave=0.d0
     alpha = 0.9d0
-    g = 1.d0
+    g = 1.0d0
     gusai = 0.001d0
     NU = 1.d0
     do i=1,rc_node
@@ -138,6 +138,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
     write(*,*) "==============================="
     write(*,*) "+++++++++++++++++++++++++++++++"
     write(*,*) ""
+	s_rc(:,:)=0.d0
 	do istep=1,rc_step
 	    isample=istep/samp_step +1
 	    do i=1,in_node
@@ -148,7 +149,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
         enddo
         call create_r_matrix
         
-        s_rc(isample,:)=0.d0
+        !s_rc(isample,:)=0.d0
         do j=1,out_node
         do i=1,rc_node
             s_rc(isample,j) = s_rc(isample,j) + r_now(i)*W_out(i,j)
