@@ -428,12 +428,12 @@ class machine_construction:
         df1 = pd.DataFrame(acc_array)
         df2 = pd.DataFrame(Wout2)
         print(df1)
-        fig, ax = plt.subplots(figsize=(12, 9))
-        sns.heatmap(df1, square=True, vmax=1, vmin=-1, center=0)
-        plt.savefig('data_out/ac_array.png')
-        fig2, ax = plt.subplots(figsize=(12, 9))
-        sns.heatmap(df2, square=True, vmax=1, vmin=-1, center=0)
-        plt.savefig('data_out/W_out.png')
+        #fig, ax = plt.subplots(figsize=(12, 9))
+        #sns.heatmap(df1, square=True, vmax=1, vmin=-1, center=0)
+        #plt.savefig('data_out/ac_array.png')
+        #fig2, ax = plt.subplots(figsize=(12, 9))
+        #sns.heatmap(df2, square=True, vmax=1, vmin=-1, center=0)
+        #plt.savefig('data_out/W_out.png')
             
     def call_Keras_CNN(self):
         model = Sequential()

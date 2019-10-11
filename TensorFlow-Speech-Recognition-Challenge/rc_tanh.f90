@@ -37,9 +37,9 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
     real(8)     e(rc_node,rc_node)
     real(8)     inverse(rc_node,rc_node)
     real(8)     beta,p,av_degree
-    real(8)     r_ave,r_max,acc
+    real(8)     r_ave,r_max,acc,err
     real(8)  alpha,g,gusai,NU
-    integer(4)  i,j ,k,f,istep,isample,result_data(1),result_rc(1)
+    integer(4)  i,j ,k,f,istep,isample,result_data(1),result_rc(1),inode
     real(8) :: PI=3.14159265358979
 !!!!!!!!lapack!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!lapack!!!!!!!!!!!!!!!!!!!!
@@ -48,6 +48,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
 !初期化
 !=======================================
     acc_array = 0.d0
+    err = 0.d0
     r_max=0.d0
     r_ave=0.d0
     alpha = 0.9d0
@@ -168,6 +169,9 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
     call out_result
     write(*,*) "=========================================="
     write(*,*) "     RC ACC >>>>>",acc/dble(rc_num) *100.d0,'%'
+    write(*,*) "=========================================="
+    write(*,*) "=========================================="
+    write(*,*) "     RC MSE >>>>>",err/dble(rc_num) *100.d0,'%'
     write(*,*) "=========================================="
     
     contains
@@ -304,6 +308,9 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
                 if(result_rc(1)==result_data(1)) then
                     acc = acc + 1.d0
                 endif
+                do inode = 1,out_node
+                    err = err + (s_rc(isample,inode) - s_rc_data(isample,inode))**2
+                enddo
             enddo
         end subroutine rc_cal_acc
         subroutine out_result
