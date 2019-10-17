@@ -47,12 +47,12 @@ PATH_test =  './data/test/audio/'
 LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
 #LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']#
 
-all_sample_num = 1000
-ndim = 8 #81#128#20
+all_sample_num = 1500
+ndim = 12 #81#128#20
 nstep =32 #100#32#32
 epoch =100
 #rc_node = 611
-rc_node = 500
+rc_node = 100
 out_node =12
 Wout = np.empty((rc_node,out_node))
 acc_array = np.empty((out_node,out_node))
@@ -85,6 +85,7 @@ class data_load:
                 train_dict_labels[ilabel+'/'+ f] = ilabel #ファイルを呼び出すと音の種類がわかる。
         
         train = pd.DataFrame.from_dict(train_dict_labels, orient="index")#indexがkeyになる
+        #train = train.sample(frac=1)
         train = train.reset_index(drop=False)#indexの値は残しておいて一旦リセット
         train = train.rename(columns={'index':'file',0:'folder'})
         train = train[['folder','file']]
@@ -210,7 +211,9 @@ class machine_construction:
         self.x_train = x_train
         self.y_train = y_train
         self.acc_array = acc_array
-    
+        np.savetxt('./data_out/np_savetxt_x_ori.txt',self.x_train[:,:,1],fmt='%.3e')
+        np.savetxt('./data_out/np_savetxt_y_ori.txt',self.y_train[:,:],fmt='%.3e')
+
     def call_Keras_LSTM_a(self):
         #最終的に(sample,nstep,ndim)
         model = Sequential()
@@ -340,13 +343,16 @@ class machine_construction:
         y_tmp2 = y_tmp1
         for k in range(ndim-1):
             y_tmp2 = np.concatenate([y_tmp2,y_tmp1],axis = -1)
-        data_tmp = np.concatenate([min_max(self.x_train, axis=1),y_tmp2],axis = 1)
+            print(y_tmp2.shape)
+        #data_tmp = np.concatenate([min_max(self.x_train, axis=1),y_tmp2],axis = 1)
+        data_tmp = np.concatenate([self.x_train,y_tmp2],axis = 1)
         data_tmp[np.isnan(data_tmp)] = 0.00000001
         
         #np.savetxt('./data_out/np_savetxt_data_tmp.txt', data_tmp,fmt='%.3e')
         #data_tmp[np.isnan(data_tmp)] = np.nanmean(data_tmp)
-        np.random.shuffle(data_tmp)
+        #np.random.shuffle(data_tmp)
         print(data_tmp.shape)
+        print(data_tmp[0,:,1])#(sample,nstep,ndim)
 
         #b[1:3, 2:4] # 1~2行目、2~3列目を抜き出す
         #1元のみ
