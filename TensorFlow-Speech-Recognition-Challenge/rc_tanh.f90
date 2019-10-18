@@ -52,14 +52,14 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
     err = 0.d0
     r_max=0.d0
     r_ave=0.d0
-    alpha = 0.9d0
+    alpha = 0.2d0
     g = 1.0d0
-    gusai = 0.001d0
+    gusai = 0.d0
     NU = 1.0d0
-    RHO = 1.d0
+    RHO = 1.0d0
     RiRj=0.d0
     RiSj=0.d0
-!    call random_number(r_ini)
+    call random_number(r_ini)
     do i=1,rc_node
     do j=1,rc_node
         w_rc(i,j)=rand_normal(0.d0, 1.d0/(rc_node**0.5d0))
@@ -79,7 +79,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
     u_tmp = 0.d0
     s_tmp = 0.d0
     r_now=  0.d0
-    r_bef=1.d0
+    r_bef=  r_ini
     w_out=0.d0
     beta=1.d-6
     e=0.d0
@@ -123,9 +123,9 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
         !if(mod(istep,samp_step)==0) write(55,*) istep,isample,nint(s_tmp(1,1:out_node))
         write(55,*) istep,isample,nint(s_tmp(1,1:out_node))
         call create_r_matrix
-        !if(mod(istep,samp_step)==0) call mean_rirj(RiRj,RiSj,istep,isample)
-        call mean_rirj(RiRj,RiSj,istep,isample)
-        !if(mod(istep,samp_step)==0) r_bef =r_ini
+        if(mod(istep,samp_step)==0) call mean_rirj(RiRj,RiSj,istep,isample)
+        !call mean_rirj(RiRj,RiSj,istep,isample)
+        if(mod(istep,samp_step)==0) r_bef =r_ini
     enddo
     close(54)
     close(55)
@@ -162,7 +162,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
         enddo
         call create_r_matrix
         
-        !s_rc(isample,:)=0.d0
+        s_rc(isample,:)=0.d0
         do j=1,out_node
         do i=1,rc_node
             s_rc(isample,j) = s_rc(isample,j) + r_now(i)*W_out(i,j)
@@ -172,11 +172,15 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
 !        write(40,*) r_now(10)
 !        close(40)
 
-        !write(*,"(13e14.3)") r_now(10),s_rc(isample,:)/istep
+!        write(*,"(13e14.3)") r_now(10),s_rc(isample,:)
+        if(mod(istep,samp_step)==0) then
+            write(*,*) istep
+            write(*,200) MAXLOC(s_rc(isample,1:out_node)),MAXLOC(s_rc_data(isample,1:out_node)),s_rc(isample,:),r_now(10)
+        endif
         write(54,*) isample,u_tmp(1,1:in_node)
         !if(mod(istep,samp_step)==0) write(55,*) istep,isample,nint(s_tmp(1,1:out_node))
         write(55,*) istep,isample,nint(s_tmp(1,1:out_node))
-        !if(mod(istep,samp_step)==0) r_bef =r_ini
+        if(mod(istep,samp_step)==0) r_bef =r_ini
     enddo
     close(54)
     close(55)
@@ -189,6 +193,8 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
     write(*,*) "=========================================="
     write(*,*) "     RC MSE >>>>>",err/dble(out_node*rc_num),'mse'
     write(*,*) "=========================================="
+100 format(a,i6,a,f15.10)
+200 format(i2,i2,11e14.3)
     
     contains
         function rand_normal(mu,sigma)
@@ -237,7 +243,9 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
             real(8) wu,ar
             integer j1,j2
             r_now = 0.d0
-            do j1=1,rc_node
+            r_now(1) = 1.d0
+            r_bef(1) = 1.d0
+            do j1=2,rc_node
                 ar =0.d0
                 wu=0.d0
                 do j2= 1,rc_node
@@ -313,7 +321,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
         	    enddo
         	enddo
         	enddo
-        	write(*,*) w_out
+        	!write(*,*) w_out
         end subroutine create_Wout_matrix
 !--------------------------------------
         subroutine rc_cal_acc
@@ -336,7 +344,7 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
             open(41,file='./data_out/output_rc_s_data.dat', status='replace')
             open(42,file='./data_out/output_rc_acc_array.dat', status='replace')
             do isample=1,rc_num
-                write(40,"(13e14.3)") s_rc(isample,1:out_node),dble(MAXLOC(s_rc(isample,1:out_node)))
+                write(40,210) MAXLOC(s_rc(isample,1:out_node)),s_rc(isample,1:out_node)
             enddo
             do isample=1,rc_num
                 write(41,*) MAXLOC(s_rc(isample,1:out_node)),MAXLOC(s_rc_data(isample,1:out_node))
@@ -344,5 +352,6 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
             close(40)
             close(41)
             close(42)
+210 format(i2,10e14.3)
         end subroutine out_result
 end subroutine rc_tanh

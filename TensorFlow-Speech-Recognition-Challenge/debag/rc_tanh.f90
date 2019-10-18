@@ -212,6 +212,8 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
             integer j1,j2
             r_now = 0.d0
             do j1=1,rc_node
+                r_now(1) = 1.d0
+                r_bef(1) = 1.d0
                 ar =0.d0
                 wu=0.d0
                 do j2= 1,rc_node

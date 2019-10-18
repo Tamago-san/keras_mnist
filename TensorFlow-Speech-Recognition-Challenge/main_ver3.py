@@ -44,16 +44,16 @@ TensorFlow-Speech-Recognition-Challenge/
 '''
 PATH_train = './data/train/audio/'
 PATH_test =  './data/test/audio/'
-LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
-#LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']#
-
-all_sample_num = 1500
+#LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
+LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']#
+#LABELS_TO_KEEP = ['zero', 'one']
+all_sample_num = 1000
 ndim = 12 #81#128#20
 nstep =32 #100#32#32
 epoch =100
 #rc_node = 611
-rc_node = 100
-out_node =12
+rc_node = 200
+out_node =len(LABELS_TO_KEEP)
 Wout = np.empty((rc_node,out_node))
 acc_array = np.empty((out_node,out_node))
 
@@ -75,7 +75,8 @@ class data_load:
 
         #とりあえず全てロードしてLABELS_TO_KEEP以外の音はUNKNOWNに設定
         train_file_labels = os.listdir(self.path)
-        train_file_labels.remove('_background_noise_')
+#        train_file_labels.remove('_background_noise_')
+
         #ラベルの辞書用意
         #dic["key"] = "value" →{"key" : "value"}
         train_dict_labels=dict()
@@ -94,7 +95,8 @@ class data_load:
         
         train['file'] = train.apply(lambda x: self.append_relative_path(*x), axis=1)#*は自動的に分けてくれる！
         train['label']= train['folder'].apply(lambda x : x if x in self.labels_to_keep else 'unknown')#新たにラベルのカラムを追加
-        self.labels_to_keep.append('unknown')
+#        train['label']= train['folder'].apply(lambda x : x if x in self.labels_to_keep)#新たにラベルのカラムを追加
+#        self.labels_to_keep.append('unknown')
         
         return train, self.labels_to_keep
     
@@ -155,9 +157,11 @@ class create_dataset:
     
     
     def make_one_hot(self,seq, voice_size):
-        seq_new = np.zeros(shape = (len(seq),voice_size))
+#        seq_new = np.zeros(shape = (len(seq),voice_size))
+        seq_new = np.full((len(seq),voice_size), -1)
+        
         for i,s in enumerate(seq):
-            seq_new[i][s] = 1.
+            seq_new[i][s] = 1
         return seq_new
         
     def audio_to_data(self,path):
@@ -191,7 +195,7 @@ class create_dataset:
         #print(self.all_data)
         label = self.all_data['label'].values
         label = [word2id[l] for l in label ]
-        one_hot_l = self.make_one_hot(label,12)#これは全てのデータ
+        one_hot_l = self.make_one_hot(label,out_node)#これは全てのデータ
         #print(one_hot_l)
         comp_data,comp_label,indexes = self.paths_to_data(self.all_data['file'].values.tolist(), one_hot_l)
         print(comp_data.shape[0])#58252
@@ -221,7 +225,7 @@ class machine_construction:
         model.add(Dropout(0.2))
         model.add(Dense(128))
         model.add(Dropout(0.2))
-        model.add(Dense(12, activation = 'softmax'))
+        model.add(Dense(out_node, activation = 'softmax'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
         model.summary()
         model.fit(self.x_train, self.y_train, batch_size = 512, epochs = epoch)
@@ -233,7 +237,7 @@ class machine_construction:
         model.add(Dropout(0.2))
         model.add(Dense(128))
         model.add(Dropout(0.2))
-        model.add(Dense(12, activation = 'linear'))
+        model.add(Dense(out_node, activation = 'linear'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
         model.summary()
         model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
@@ -242,7 +246,7 @@ class machine_construction:
         #最終的に(sample,nstep,ndim)
         model = Sequential()
         model.add(LSTM(128, input_shape = (nstep,ndim)))
-        model.add(Dense(12, activation = 'linear'))
+        model.add(Dense(out_node, activation = 'linear'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
         model.summary()
         model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)

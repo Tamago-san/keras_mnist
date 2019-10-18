@@ -299,7 +299,7 @@ RC_STEP = datalen - TRANING_STEP #トレーニングとRCとを分ける
 ####
 data_out = np.empty((RC_STEP,out_node))
 Wout = np.empty((rc_node,out_node))
-call_fortran_tanh(DATASET,data_out,Wout,ndim,out_node,rc_node,TRANING_STEP,RC_STEP)
+call_fortran_tanh(DATASET,data_out,Wout,ndim,out_node,rc_node+1,TRANING_STEP,RC_STEP)
 print(data_out.shape)
 #call_fortran_tanh(data,y_rc,_in_node,_out_node,_rc_node,_traning_step,_rc_step):
 
