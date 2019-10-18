@@ -52,7 +52,8 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
     err = 0.d0
     r_max=0.d0
     r_ave=0.d0
-    alpha = 0.2d0
+    alpha = 0.9d0
+    beta=1.d-8
     g = 1.0d0
     gusai = 0.d0
     NU = 1.0d0
@@ -81,7 +82,6 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
     r_now=  0.d0
     r_bef=  r_ini
     w_out=0.d0
-    beta=1.d-6
     e=0.d0
     do i=1,rc_node
         e(i,i)=1.d0
@@ -155,10 +155,12 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
 	do istep=1,rc_step
 	    isample=(istep-1)/samp_step +1
 	    do i=1,in_node
-            u_tmp(1,i) = u_rc(istep,i)
+!            u_tmp(1,i) = u_rc(istep,i)
+            u_tmp(1,i) = u_tr(istep,i)
         enddo
         do i=1,out_node
-            s_tmp(1,i) = s_rc_data(isample,i)
+!            s_tmp(1,i) = s_rc_data(isample,i)
+            s_tmp(1,i) = s_tr(isample,i)
         enddo
         call create_r_matrix
         
@@ -175,7 +177,8 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
 !        write(*,"(13e14.3)") r_now(10),s_rc(isample,:)
         if(mod(istep,samp_step)==0) then
             write(*,*) istep
-            write(*,200) MAXLOC(s_rc(isample,1:out_node)),MAXLOC(s_rc_data(isample,1:out_node)),s_rc(isample,:),r_now(10)
+!            write(*,200) MAXLOC(s_rc(isample,1:out_node)),MAXLOC(s_rc_data(isample,1:out_node)),s_rc(isample,:),r_now(10)
+            write(*,200) MAXLOC(s_rc(isample,1:out_node)),MAXLOC(s_tmp(1,1:out_node)),s_rc(isample,:),r_now(10)
         endif
         write(54,*) isample,u_tmp(1,1:in_node)
         !if(mod(istep,samp_step)==0) write(55,*) istep,isample,nint(s_tmp(1,1:out_node))
@@ -328,14 +331,16 @@ subroutine rc_tanh(in_node,out_node,rc_node,&
             integer(4)  result_data(1),result_rc(1)
             do isample=1,rc_num
                 result_rc  =MAXLOC(s_rc(isample,1:out_node))
-                result_data=MAXLOC(s_rc_data(isample,1:out_node))
+                !result_data=MAXLOC(s_rc_data(isample,1:out_node))
+                result_data=MAXLOC(s_tr(isample,1:out_node))
                 write(56,*) result_rc,result_data
                 acc_array(result_data(1),result_rc(1)) =acc_array(result_data(1),result_rc(1)) +1
                 if(result_rc(1)==result_data(1)) then
                     acc = acc + 1.d0
                 endif
                 do inode = 1,out_node
-                    err = err + (s_rc(isample,inode)/dble(samp_step)- s_rc_data(isample,inode))**2
+!                    err = err + (s_rc(isample,inode)/dble(samp_step)- s_rc_data(isample,inode))**2
+                    err = err + (s_rc(isample,inode)/dble(samp_step)- s_tr(isample,inode))**2
                 enddo
             enddo
         end subroutine rc_cal_acc
