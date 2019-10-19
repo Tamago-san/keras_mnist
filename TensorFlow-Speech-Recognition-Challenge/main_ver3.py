@@ -222,8 +222,6 @@ class machine_construction:
         np.savetxt('./data_out/np_savetxt_x_ori.txt',self.x_train[:,:,1],fmt='%.3e')
         np.savetxt('./data_out/np_savetxt_y_ori.txt',self.y_train[:,:],fmt='%.3e')
         
-        self.x_train = self.x_train.reshape(self.x_train.shape + (1,))
-        self.x_test  = self.x_test .reshape(self.x_test .shape + (1,))
 
     def call_Keras_LSTM_a(self):
         #最終的に(sample,nstep,ndim)
