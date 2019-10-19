@@ -47,7 +47,7 @@ PATH_test =  './data/test/audio/'
 #LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
 #LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']#
 LABELS_TO_KEEP = ['zero', 'one']
-all_sample_num = 20000
+all_sample_num = 2000
 ndim = 32 #81#128#20
 nstep =32 #100#32#32
 epoch =200
@@ -106,8 +106,8 @@ class data_load:
 class create_dataset:
     def __init__(self,data,path):
         data = data.sample(frac=1).reset_index(drop=True)
-#        self.all_data = data[:all_sample_num]
-        self.all_data = data
+        self.all_data = data[:all_sample_num]
+#        self.all_data = data
         self.path=path
         self.labels_to_keep = LABELS_TO_KEEP
         self.input_step = 0
@@ -221,6 +221,9 @@ class machine_construction:
         self.acc_array = acc_array
         np.savetxt('./data_out/np_savetxt_x_ori.txt',self.x_train[:,:,1],fmt='%.3e')
         np.savetxt('./data_out/np_savetxt_y_ori.txt',self.y_train[:,:],fmt='%.3e')
+        
+        self.x_train = self.x_train.reshape(self.x_train.shape + (1,))
+        self.x_test  = self.x_test .reshape(self.x_test .shape + (1,))
 
     def call_Keras_LSTM_a(self):
         #最終的に(sample,nstep,ndim)
@@ -461,20 +464,22 @@ class machine_construction:
             
     def call_Keras_CNN(self):
         model = Sequential()
-        model.add(Conv2D(32, kernel_size=(3, 3), activation='relu',input_shape = (nstep,ndim)))
+        model.add(Conv2D(32, kernel_size=(3, 3), activation='relu',input_shape = (nstep,ndim,1)))
         model.add(Conv2D(64, (3, 3), activation='relu'))
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Dropout(0.25))
         model.add(Flatten())
         model.add(Dense(128, activation='relu'))
         model.add(Dropout(0.5))
-        model.add(Dense(10, activation='softmax'))
+        model.add(Dense(out_node, activation='softmax'))
         model.compile(loss='categorical_crossentropy',
                       optimizer=RMSprop(),
                       metrics=['accuracy'])
+        self.x_train = self.x_train.reshape(self.x_train.shape + (1,))
+        self.x_test  = self.x_test .reshape(self.x_test .shape + (1,))
         history = model.fit(self.x_train, self.y_train,
                             batch_size=128,
-                            epochs=10,
+                            epochs=epoch,
                             verbose=1,
                             validation_data=(self.x_test, self.y_test))
     
