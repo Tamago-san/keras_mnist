@@ -45,14 +45,14 @@ TensorFlow-Speech-Recognition-Challenge/
 PATH_train = './data/train/audio/'
 PATH_test =  './data/test/audio/'
 #LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
-LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']#
-#LABELS_TO_KEEP = ['zero', 'one']
-all_sample_num = 1000
-ndim = 12 #81#128#20
+#LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']#
+LABELS_TO_KEEP = ['zero', 'one']
+all_sample_num = 20000
+ndim = 32 #81#128#20
 nstep =32 #100#32#32
-epoch =100
+epoch =200
 #rc_node = 611
-rc_node = 200
+rc_node = 500
 out_node =len(LABELS_TO_KEEP)
 Wout = np.empty((rc_node,out_node))
 acc_array = np.empty((out_node,out_node))
@@ -106,8 +106,8 @@ class data_load:
 class create_dataset:
     def __init__(self,data,path):
         data = data.sample(frac=1).reset_index(drop=True)
-        self.all_data = data[:all_sample_num]
-#        self.all_data = data
+#        self.all_data = data[:all_sample_num]
+        self.all_data = data
         self.path=path
         self.labels_to_keep = LABELS_TO_KEEP
         self.input_step = 0
@@ -153,12 +153,13 @@ class create_dataset:
         #mfccs =sklearn.preprocessing.minmax_scale(mfccs,axis=1)
         
         return mfccs.T#(時間,次元)で返す
+#        return mfccs#(時間,次元)で返す
 
     
     
     def make_one_hot(self,seq, voice_size):
 #        seq_new = np.zeros(shape = (len(seq),voice_size))
-        seq_new = np.full((len(seq),voice_size), -1)
+        seq_new = np.full((len(seq),voice_size), 0)
         
         for i,s in enumerate(seq):
             seq_new[i][s] = 1
@@ -212,8 +213,11 @@ class create_dataset:
 class machine_construction:
     def __init__(self,x_train,y_train,acc_array):
 #        self.x_train = min_max(x_train, axis=1)
-        self.x_train = x_train
-        self.y_train = y_train
+        _len=int(x_train.shape[0]*0.8)
+        self.x_train = x_train[:_len,:,:]
+        self.y_train = y_train[:_len,:]
+        self.x_test  = x_train[_len:,:,:]
+        self.y_test  = y_train[_len:,:]
         self.acc_array = acc_array
         np.savetxt('./data_out/np_savetxt_x_ori.txt',self.x_train[:,:,1],fmt='%.3e')
         np.savetxt('./data_out/np_savetxt_y_ori.txt',self.y_train[:,:],fmt='%.3e')
@@ -227,8 +231,12 @@ class machine_construction:
         model.add(Dropout(0.2))
         model.add(Dense(out_node, activation = 'softmax'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
+#        model.compile(optimizer = 'Adam', loss = 'categorical_crossentropy', metrics = ['accuracy'])
         model.summary()
-        model.fit(self.x_train, self.y_train, batch_size = 512, epochs = epoch)
+        model.fit(self.x_train, self.y_train,
+                  batch_size = 256,
+                  epochs = epoch,
+                  validation_data=(self.x_test,self.y_test))
     
     def call_Keras_LSTM_b(self):
         #最終的に(sample,nstep,ndim)
@@ -240,7 +248,10 @@ class machine_construction:
         model.add(Dense(out_node, activation = 'linear'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
         model.summary()
-        model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
+        model.fit(self.x_train, self.y_train,
+                batch_size = 1024,
+                epochs = epoch,
+                validation_data=(self.x_test,self.y_test))
 
     def call_Keras_LSTM_c(self):
         #最終的に(sample,nstep,ndim)
@@ -249,7 +260,10 @@ class machine_construction:
         model.add(Dense(out_node, activation = 'linear'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
         model.summary()
-        model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
+        model.fit(self.x_train, self.y_train,
+                  batch_size = 1024,
+                  epochs = epoch,
+                  validation_data=(self.x_test,self.y_test))
     
     def call_fortran_poseidon(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_all_step):
         
@@ -447,7 +461,7 @@ class machine_construction:
             
     def call_Keras_CNN(self):
         model = Sequential()
-        model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(28, 28, 1)))
+        model.add(Conv2D(32, kernel_size=(3, 3), activation='relu',input_shape = (nstep,ndim)))
         model.add(Conv2D(64, (3, 3), activation='relu'))
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Dropout(0.25))
@@ -478,11 +492,12 @@ if __name__ == '__main__':
     
     mc=machine_construction(data, one_hot_l,acc_array)
     print(data.shape)
-#    mc.call_Keras_LSTM_c()
+#    mc.call_Keras_LSTM_a()
+    mc.call_Keras_CNN()
 #    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
 #                        int(data.shape[0]*nstep))
-    mc.call_fortran_tanh(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
-                        int(data.shape[0]*nstep))
+#    mc.call_fortran_tanh(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
+#                        int(data.shape[0]*nstep))
 #
     
     
