@@ -48,8 +48,8 @@ PATH_train = './data/train/audio/'
 PATH_test =  './data/test/audio/'
 #LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
 #LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']#
-LABELS_TO_KEEP = ['zero', 'one']
-all_sample_num = 2000
+LABELS_TO_KEEP = ['zero', 'one','three']
+all_sample_num = 10
 ndim = 96 #81#128#20
 nstep =32 #100#32#32
 epoch =200
@@ -87,7 +87,7 @@ class data_load:
         for iname,ilabel in enumerate(train_file_labels):
             ifiles = os.listdir(self.path +'/' +ilabel)
             for f in ifiles:
-                train_dict_labels[ilabel+'/'+ f] = [ilabel,iname] #ファイルを呼び出すと音の種類がわかる。
+                train_dict_labels[PATH_train+ilabel+'/'+ f] = [ilabel,iname] #ファイルを呼び出すと音の種類がわかる。
         #print(train_dict_labels)
         
         train= pd.DataFrame.from_dict(train_dict_labels, orient="index")#indexがkeyになる
@@ -130,17 +130,6 @@ class create_dataset:
         return mfccs.T#(時間,次元)で返す
 #        return mfccs#(時間,次元)で返す
 
-    
-    
-    def make_one_hot(self,seq, voice_size):
-#        seq_new = np.zeros(shape = (len(seq),voice_size))
-        seq_new = np.full((len(seq),voice_size), 0)
-        
-        for i,s in enumerate(seq):
-            seq_new[i][s] = 1
-        return seq_new
-    
-        
     def audio_to_data(self,path):
         # we take a single path and convert it into data
         sample_rate, audio = wavfile.read(path)
@@ -151,45 +140,29 @@ class create_dataset:
     
     
     def paths_to_data(self,paths,labels):
-        data = np.zeros(shape = (len(paths),nstep,ndim))#len(paths)はサンプル数
-        indexes = []
+        final_data = np.zeros(shape = (1,nstep,ndim))#len(paths)はサンプル数
+        final_label = np.zeros(shape = (1,out_node))
         for i in tqdm(range(len(paths))): #tqdmはプログレスバーの表示0からサンプル数
             #print(paths[i])
             audio = self.audio_to_data(paths[i])#ここで（時間,信号次元)で返り値を得るように作る
+            ilabel = labels[i,:]
             if audio.shape != (nstep,ndim):
-                indexes.append(i)
+                pass
             else:
-                data[i] = audio#形状の一致しているもののみデータとして抽出。
+                final_data = np.append(final_data,audio.reshape(1,nstep,ndim),axis=0)
+                final_label= np.append(final_label,ilabel.reshape(1,out_node),axis=0)
         
-        final_labels = [l for i,l in enumerate(labels) if i not in indexes]#形状の一致していないものを除外
-        print('Number of instances with inconsistent shape:', len(indexes))
+        print('Number of instances with inconsistent shape:', final_data.shape[0])
         
-        return data[:len(data)-len(indexes)], np.array(final_labels), indexes
+        return np.delete(final_data,0,axis=0), np.delete(final_label,0,axis=0)
         #形状の不一致のため実際にdataに値の入っている場所はdata[:len(data)-len(indexes)]の部分になる。
     
     def main1(self):
-
-        word2id = dict( (_ilabel,_index) for _index, _ilabel in enumerate(self.labels_to_keep)  )
+#        word2id = dict( (_ilabel,_index) for _index, _ilabel in enumerate(self.labels_to_keep)  )
         #print(self.all_data)
         label = self.all_data['label'].values
-        print('label-shape')
-        print(label.shape)
-        label = [word2id[l] for l in label ]
-
-        one_hot_l = self.make_one_hot(label,out_node)#これは全てのデータ
-        one_hot_l2 = to_categorical(label, num_classes=out_node)
-        print(one_hot_l2)
-        #print(one_hot_l)
-        comp_data,comp_label,indexes = self.paths_to_data(self.all_data['file'].values.tolist(), one_hot_l)
-        print(comp_data.shape[0])#58252
-        print(comp_data)
-        #comp_labels = np.zeros(shape = [comp_data.shape[0],len(l[0]) ])#(データ長さ,ラベル長が)
-        #for i,array in enumerate(l):
-        #    for j,element in enumerate(array):
-        #        comp_labels[i][j] = element
-        print(comp_label)
-        print(comp_data.shape)
-        print(comp_label.shape)
+        one_hot_l = to_categorical(label, num_classes=out_node)
+        comp_data,comp_label = self.paths_to_data(self.all_data['file'].values.tolist(), one_hot_l)
         return comp_data,comp_label
 
 
@@ -197,13 +170,13 @@ class create_dataset:
 if __name__ == '__main__':
     
     voice_d = data_load(PATH_train)
-    all_train_data , labels_to_keep = voice_d.load_files()
-    train_data = all_train_data.loc[all_train_data['label'] != 'unkonwn']['file'].values #unknown以外格納
+    all_train_data = voice_d.load_files()
     cd=create_dataset(all_train_data,PATH_train)
     data,one_hot_l = cd.main1()
     
     mc=machine_construction(data, one_hot_l,acc_array)
     print(data.shape)
+    print(data)
 #    mc.call_Keras_LSTM_a()
     mc.call_Keras_CNN()
 #    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
