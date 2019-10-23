@@ -223,7 +223,7 @@ class machine_construction:
                   epochs = epoch,
                   validation_data=(self.x_test,self.y_test))
     
-    def call_fortran_poseidon(self,_in_node,_out_node,_rc_node,_samp_step,_all_step):
+    def call_fortran_poseidon(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_all_step):
         
         y_tmp1 = self.y_train.reshape(self.y_train.shape[0],self.y_train.shape[1],1)
         y_tmp3 = self.y_test.reshape(self.y_test.shape[0],self.y_test.shape[1],1)
