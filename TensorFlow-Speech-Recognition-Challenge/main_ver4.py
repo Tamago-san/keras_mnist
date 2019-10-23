@@ -46,12 +46,12 @@ TensorFlow-Speech-Recognition-Challenge/
 PATH_train = './data/train/audio/'
 PATH_test =  './data/test/audio/'
 #LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
-#LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']#
-LABELS_TO_KEEP = ['zero', 'one','three']
-all_sample_num = 2000
-ndim = 96 #81#128#20
+LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']#
+#LABELS_TO_KEEP = ['zero', 'one','two','three']
+all_sample_num = 10000
+ndim = 1 #81#128#20
 nstep =32 #100#32#32
-epoch =200
+epoch =500
 #rc_node = 611
 rc_node = 500
 out_node =len(LABELS_TO_KEEP)
@@ -61,8 +61,14 @@ acc_array = np.empty((out_node,out_node))
 def min_max(x, axis=None):
     min = x.min(axis=axis, keepdims=True)
     max = x.max(axis=axis, keepdims=True)
-    result = (x-min)/(max-min)
+    result = 2.*(x-min)/(max-min) -1.
     return result
+
+def zscore(x, axis = None):
+    xmean = x.mean(axis=axis, keepdims=True)
+    xstd  = np.std(x, axis=axis, keepdims=True)
+    zscore = (x-xmean)/xstd
+    return zscore
     
 class data_load:
     def __init__(self,path):
@@ -77,7 +83,7 @@ class data_load:
         train_dict_labels=dict()
  
         for iname,ilabel in enumerate(train_file_labels):
-            ifiles = os.listdir(self.path +'/' +ilabel)
+            ifiles = os.listdir(self.path +ilabel)
             for f in ifiles:
                 train_dict_labels[PATH_train+ilabel+'/'+ f] = [ilabel,iname] #ファイルを呼び出すと音の種類がわかる。
         #print(train_dict_labels)
@@ -161,13 +167,16 @@ class create_dataset:
 class machine_construction:
     def __init__(self,x_train,y_train,acc_array):
 #        self.x_train = min_max(x_train, axis=1)
-        _len=int(x_train.shape[0]*0.8)
-        self.x_train = x_train[:_len,:,:]
-        self.y_train = y_train[:_len,:]
-        self.x_test  = x_train[_len:,:,:]
-        self.y_test  = y_train[_len:,:]
+        self.train_num=int(x_train.shape[0]*0.8)
+        self.test_num =x_train.shape[0]-self.train_num
+        self.x_train = x_train[:self.train_num,:,:]
+        self.y_train = y_train[:self.train_num,:]
+        self.x_test  = x_train[self.train_num:,:,:]
+        self.y_test  = y_train[self.train_num:,:]
         self.acc_array = acc_array
-        np.savetxt('./data_out/np_savetxt_x_ori.txt',self.x_train[:,:,1],fmt='%.3e')
+        print('testだ')
+        print(self.x_test)
+        np.savetxt('./data_out/np_savetxt_x_ori.txt',self.x_train[:,:,0],fmt='%.3e')
         np.savetxt('./data_out/np_savetxt_y_ori.txt',self.y_train[:,:],fmt='%.3e')
         
 
@@ -214,32 +223,36 @@ class machine_construction:
                   epochs = epoch,
                   validation_data=(self.x_test,self.y_test))
     
-    def call_fortran_poseidon(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_all_step):
+    def call_fortran_poseidon(self,_in_node,_out_node,_rc_node,_samp_step,_all_step):
         
         y_tmp1 = self.y_train.reshape(self.y_train.shape[0],self.y_train.shape[1],1)
+        y_tmp3 = self.y_test.reshape(self.y_test.shape[0],self.y_test.shape[1],1)
         y_tmp2 = y_tmp1
+        y_tmp4 = y_tmp3
         for k in range(ndim-1):
             y_tmp2 = np.concatenate([y_tmp2,y_tmp1],axis = -1)
-        data_tmp = np.concatenate([min_max(self.x_train, axis=1),y_tmp2],axis = 1)
-        data_tmp[np.isnan(data_tmp)] = 0.00000001
+            y_tmp4 = np.concatenate([y_tmp4,y_tmp3],axis = -1)
+        data_train = np.concatenate([min_max(self.x_train, axis=1),y_tmp2],axis = 1)
+        data_test  = np.concatenate([min_max(self.x_test, axis=1),y_tmp4],axis = 1)
+        data_train[np.isnan(data_train)] = 0.00000001
+        data_test[np.isnan(data_test)] = 0.00000001
         
-        #np.savetxt('./data_out/np_savetxt_data_tmp.txt', data_tmp,fmt='%.3e')
-        #data_tmp[np.isnan(data_tmp)] = np.nanmean(data_tmp)
-        print(data_tmp)
-        np.random.shuffle(data_tmp)
-        print(data_tmp)
-
+        
+        
+        #np.savetxt('./data_out/np_savetxt_data_train.txt', data_train,fmt='%.3e')
+        #data_train[np.isnan(data_train)] = np.nanmean(data_train)
         #b[1:3, 2:4] # 1~2行目、2~3列目を抜き出す
         #1元のみ
-        _traning_num =int(_samp_num*0.8)
-        _rc_num = int(_samp_num*0.2)
+        _traning_num =self.train_num
+        _rc_num = self.test_num
         _traning_step = nstep* _traning_num
         _rc_step = nstep* _rc_num
-        x_tr = data_tmp[:_traning_num,0:nstep,0:ndim]
-        y_tr = data_tmp[:_traning_num,nstep:,0]
-        x_te = data_tmp[_traning_num:_traning_num+_rc_num,0:nstep,0:ndim]
-        y_te = data_tmp[_traning_num:_traning_num+_rc_num,nstep:,0]
+        x_tr = data_train[:,0:nstep,0:ndim]
+        y_tr = data_train[:,nstep:,0]
+        x_te = data_test[:,0:nstep,0:ndim]
+        y_te = data_test[:,nstep:,0]
         
+
         x_tr  =x_tr.reshape(-1,ndim)
         x_te  =x_te.reshape(-1,ndim)
         y_tr  =y_tr.reshape(-1,out_node)
@@ -259,6 +272,7 @@ class machine_construction:
         y_tr  =y_tr.T.copy().astype('float64')
         y_te  =y_te.T.copy().astype('float64')
         Wout2 = Wout.T.copy().astype('float64')
+        acc_array = self.acc_array.T.copy().astype('float64')
         np.savetxt('./data_out/np_savetxt_u.txt', x_tr.T,fmt='%.3e')
         np.savetxt('./data_out/np_savetxt_s.txt', y_tr.T,fmt='%.3e')
 
@@ -268,6 +282,7 @@ class machine_construction:
         print(x_te.shape)
         print(y_te.shape)
         
+
         f = np.ctypeslib.load_library("rc_poseidon.so", ".")
         f.rc_poseidon_.argtypes = [
             ctypes.POINTER(ctypes.c_int32),
@@ -307,31 +322,33 @@ class machine_construction:
         
         
         y_tmp1 = self.y_train.reshape(self.y_train.shape[0],self.y_train.shape[1],1)
+        y_tmp3 = self.y_test.reshape(self.y_test.shape[0],self.y_test.shape[1],1)
         y_tmp2 = y_tmp1
+        y_tmp4 = y_tmp3
         for k in range(ndim-1):
             y_tmp2 = np.concatenate([y_tmp2,y_tmp1],axis = -1)
-            print(y_tmp2.shape)
-        #data_tmp = np.concatenate([min_max(self.x_train, axis=1),y_tmp2],axis = 1)
-        data_tmp = np.concatenate([self.x_train,y_tmp2],axis = 1)
-        data_tmp[np.isnan(data_tmp)] = 0.00000001
+            y_tmp4 = np.concatenate([y_tmp4,y_tmp3],axis = -1)
+        data_train = np.concatenate([min_max(self.x_train, axis=1),y_tmp2],axis = 1)
+        data_test  = np.concatenate([min_max(self.x_test, axis=1),y_tmp4],axis = 1)
+        data_train[np.isnan(data_train)] = 0.00000001
+        data_test[np.isnan(data_test)] = 0.00000001
         
-        #np.savetxt('./data_out/np_savetxt_data_tmp.txt', data_tmp,fmt='%.3e')
-        #data_tmp[np.isnan(data_tmp)] = np.nanmean(data_tmp)
-        #np.random.shuffle(data_tmp)
-        print(data_tmp.shape)
-        print(data_tmp[0,:,1])#(sample,nstep,ndim)
-
+        
+        
+        #np.savetxt('./data_out/np_savetxt_data_train.txt', data_train,fmt='%.3e')
+        #data_train[np.isnan(data_train)] = np.nanmean(data_train)
         #b[1:3, 2:4] # 1~2行目、2~3列目を抜き出す
         #1元のみ
-        _traning_num =int(_samp_num*0.8)
-        _rc_num = int(_samp_num*0.2)
+        _traning_num =self.train_num
+        _rc_num = self.test_num
         _traning_step = nstep* _traning_num
         _rc_step = nstep* _rc_num
-        x_tr = data_tmp[:_traning_num,0:nstep,0:ndim]
-        y_tr = data_tmp[:_traning_num,nstep:,0]
-        x_te = data_tmp[_traning_num:_traning_num+_rc_num,0:nstep,0:ndim]
-        y_te = data_tmp[_traning_num:_traning_num+_rc_num,nstep:,0]
+        x_tr = data_train[:,0:nstep,0:ndim]
+        y_tr = data_train[:,nstep:,0]
+        x_te = data_test[:,0:nstep,0:ndim]
+        y_te = data_test[:,nstep:,0]
         
+
         x_tr  =x_tr.reshape(-1,ndim)
         x_te  =x_te.reshape(-1,ndim)
         y_tr  =y_tr.reshape(-1,out_node)
@@ -444,9 +461,9 @@ if __name__ == '__main__':
     mc=machine_construction(data, one_hot_l,acc_array)
     print(data.shape)
 #    mc.call_Keras_LSTM_a()
-    mc.call_Keras_CNN()
-#    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
-#                        int(data.shape[0]*nstep))
+#    mc.call_Keras_CNN()
+    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
+                        int(data.shape[0]*nstep))
 #    mc.call_fortran_tanh(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
 #                        int(data.shape[0]*nstep))
 #
