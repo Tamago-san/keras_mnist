@@ -56,8 +56,8 @@ all_sample_num = 1000
 ndim = 2 #81#128#20
 nstep =32 #100#32#32
 epoch =100
-rc_node = 611
-#rc_node = 500
+#rc_node = 611
+rc_node = 128
 out_node =len(LABELS_TO_KEEP)
 Wout = np.empty((rc_node,out_node))
 acc_array = np.empty((out_node,out_node))
@@ -199,7 +199,7 @@ class machine_construction:
                             batch_size = 128,
                             epochs = epoch,
                             validation_data=(self.x_test,self.y_test))
-        return np.array(history.history['val_loss']).reshape(-1,1)
+        return history.history
     
     def call_Keras_LSTM_b(self):
         #最終的に(sample,nstep,ndim)
@@ -216,7 +216,7 @@ class machine_construction:
                             epochs = epoch,
                             validation_data=(self.x_test,self.y_test))
                             
-        return np.array(history.history['val_loss']).reshape(-1,1)
+        return history.history
 
     def call_Keras_LSTM_c(self):
         #最終的に(sample,nstep,ndim)
@@ -230,7 +230,7 @@ class machine_construction:
                             epochs = epoch,
                             validation_data=(self.x_test,self.y_test))
                             
-        return np.array(history.history['val_loss']).reshape(-1,1)
+        return history.history
 
     def call_Keras_RNN(self):
         #最終的に(sample,nstep,ndim)
@@ -243,8 +243,9 @@ class machine_construction:
                             batch_size = 128,
                             epochs = epoch,
                             validation_data=(self.x_test,self.y_test))
-        
-        return np.array(history.history['val_loss']).reshape(-1,1)
+
+#        print(history.history)
+        return history.history
     
     def call_fortran_poseidon(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_all_step):
         
@@ -468,15 +469,16 @@ class machine_construction:
                       optimizer=RMSprop(),
                       metrics=['accuracy'])
         self.x_train = self.x_train.reshape(self.x_train.shape + (1,))
-        self.x_test  = self.x_test .reshape(self.x_test .shape + (1,))
+        self.x_test  = self.x_test .reshape().reshape(self.x_test .shape + (1,))
         history = model.fit(self.x_train, self.y_train,
                             batch_size=128,
                             epochs=epoch,
                             verbose=1,
                             validation_data=(self.x_test, self.y_test))
         
-        return np.array(history.history['val_loss']).reshape(-1,1)
-    
+#        print(history)
+        return history.history
+#        return np.array(history.history['val_loss']).reshape(-1,1)
 
 
 
@@ -499,11 +501,12 @@ if __name__ == '__main__':
     
     mc=machine_construction(data, one_hot_l,acc_array)
     print(data.shape)
-    #history_a=mc.call_Keras_LSTM_a()
-    #history_b=mc.call_Keras_LSTM_b()
-    #history_c=mc.call_Keras_LSTM_c()
-    #history_rnn=mc.call_Keras_RNN()
-    #history_cnn=mc.call_Keras_CNN()
+#    history_a=mc.call_Keras_LSTM_a()
+#    history_b=mc.call_Keras_LSTM_b()
+#    history_c=mc.call_Keras_LSTM_c()
+#    history_rnn=mc.call_Keras_RNN()
+#    print(history_rnn)
+#    history_cnn=mc.call_Keras_CNN()
 #    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
 #                        int(data.shape[0]*nstep))
     mc.call_fortran_tanh(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
@@ -511,7 +514,43 @@ if __name__ == '__main__':
 
     
     
-    
-    
+#plt.figure()
+#plt.rcParams['font.family'] ='sans-serif'#使用するフォント
+#plt.title("validation error", fontsize=14)
+#plt.xlabel("epoch", fontsize=14)
+#
+##plt.ylabel("val acc", fontsize=14)
+#plt.grid()
+#plt.ylabel("mse", fontsize=14)
+#plt.yticks( np.arange(0, 0.35, 0.05) )
+#plt.ylim([0,0.35])
+## plot
+#plt.plot(np.array(history_a['val_loss']).reshape(-1,1), linestyle='-', label='LSTM a')
+#plt.plot(np.array(history_b['val_loss']).reshape(-1,1), linestyle='-', label='LSTM b')
+#plt.plot(np.array(history_c['val_loss']).reshape(-1,1), linestyle='-', label='LSTM c')
+#plt.plot(np.array(history_rnn['val_loss']).reshape(-1,1), linestyle='-', label='Simple RNN')
+##plt.yscale('log')
+#plt.legend(loc='upper right')
+#plt.savefig('./data_out/validation_error.png')
+#
+#
+#
+#
+#plt.figure()
+#plt.rcParams['font.family'] ='sans-serif'#使用するフォント
+#plt.title("validation accuracy", fontsize=14)
+#plt.xlabel("epoch", fontsize=14)
+#plt.ylabel("acc", fontsize=14)
+#plt.grid()
+##plt.ylabel("val mse", fontsize=14)
+#plt.yticks( np.arange(0, 1, 0.1) )
+#plt.ylim([0.4,1.0])
+#plt.plot(np.array(history_a['val_acc']).reshape(-1,1), linestyle='-', label='LSTM a')
+#plt.plot(np.array(history_b['val_acc']).reshape(-1,1), linestyle='-', label='LSTM b')
+#plt.plot(np.array(history_c['val_acc']).reshape(-1,1), linestyle='-', label='LSTM c')
+#plt.plot(np.array(history_rnn['val_acc']).reshape(-1,1), linestyle='-', label='Simple RNN')
+#plt.legend(loc='lower right')
+#plt.savefig('./data_out/validation_accuracy.png')
+
     
     
