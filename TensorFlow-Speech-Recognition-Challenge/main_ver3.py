@@ -26,6 +26,10 @@ from sklearn.preprocessing import MinMaxScaler
 import sklearn
 import warnings
 import scipy.stats
+import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib as mpl
+
 
 warnings.filterwarnings('ignore')
 
@@ -40,15 +44,23 @@ TensorFlow-Speech-Recognition-Challenge/
 '''
 PATH_train = './data/train/audio/'
 PATH_test =  './data/test/audio/'
-LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
-
-ndim = 1 #81#128#20
+#LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', '_background_noise_']
+#LABELS_TO_KEEP = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']#
+LABELS_TO_KEEP = ['zero', 'one','three']
+all_sample_num = 2000
+ndim = 96 #81#128#20
 nstep =32 #100#32#32
-epoch =20
+epoch =200
 #rc_node = 611
+<<<<<<< HEAD
 rc_node = 10
 out_node =12
+=======
+rc_node = 500
+out_node =len(LABELS_TO_KEEP)
+>>>>>>> 866061f2ae0bc2f627eb213b32e47855d478d32e
 Wout = np.empty((rc_node,out_node))
+acc_array = np.empty((out_node,out_node))
 
 def min_max(x, axis=None):
     min = x.min(axis=axis, keepdims=True)
@@ -68,7 +80,8 @@ class data_load:
 
         #とりあえず全てロードしてLABELS_TO_KEEP以外の音はUNKNOWNに設定
         train_file_labels = os.listdir(self.path)
-        train_file_labels.remove('_background_noise_')
+#        train_file_labels.remove('_background_noise_')
+
         #ラベルの辞書用意
         #dic["key"] = "value" →{"key" : "value"}
         train_dict_labels=dict()
@@ -78,6 +91,7 @@ class data_load:
                 train_dict_labels[ilabel+'/'+ f] = ilabel #ファイルを呼び出すと音の種類がわかる。
         
         train = pd.DataFrame.from_dict(train_dict_labels, orient="index")#indexがkeyになる
+        #train = train.sample(frac=1)
         train = train.reset_index(drop=False)#indexの値は残しておいて一旦リセット
         train = train.rename(columns={'index':'file',0:'folder'})
         train = train[['folder','file']]
@@ -86,7 +100,8 @@ class data_load:
         
         train['file'] = train.apply(lambda x: self.append_relative_path(*x), axis=1)#*は自動的に分けてくれる！
         train['label']= train['folder'].apply(lambda x : x if x in self.labels_to_keep else 'unknown')#新たにラベルのカラムを追加
-        self.labels_to_keep.append('unknown')
+#        train['label']= train['folder'].apply(lambda x : x if x in self.labels_to_keep)#新たにラベルのカラムを追加
+#        self.labels_to_keep.append('unknown')
         
         return train, self.labels_to_keep
     
@@ -96,7 +111,8 @@ class data_load:
 class create_dataset:
     def __init__(self,data,path):
         data = data.sample(frac=1).reset_index(drop=True)
-        self.all_data = data[:1000]
+        self.all_data = data[:all_sample_num]
+#        self.all_data = data
         self.path=path
         self.labels_to_keep = LABELS_TO_KEEP
         self.input_step = 0
@@ -139,15 +155,19 @@ class create_dataset:
         #print("完成の次元")
         #print(mfccs.shape)#(128, 32)(次元,時間)
         mfccs = sklearn.preprocessing.scale(mfccs, axis=1)
+        #mfccs =sklearn.preprocessing.minmax_scale(mfccs,axis=1)
         
         return mfccs.T#(時間,次元)で返す
+#        return mfccs#(時間,次元)で返す
 
     
     
     def make_one_hot(self,seq, voice_size):
-        seq_new = np.zeros(shape = (len(seq),voice_size))
+#        seq_new = np.zeros(shape = (len(seq),voice_size))
+        seq_new = np.full((len(seq),voice_size), 0)
+        
         for i,s in enumerate(seq):
-            seq_new[i][s] = 1.
+            seq_new[i][s] = 1
         return seq_new
         
     def audio_to_data(self,path):
@@ -181,7 +201,7 @@ class create_dataset:
         #print(self.all_data)
         label = self.all_data['label'].values
         label = [word2id[l] for l in label ]
-        one_hot_l = self.make_one_hot(label,12)#これは全てのデータ
+        one_hot_l = self.make_one_hot(label,out_node)#これは全てのデータ
         #print(one_hot_l)
         comp_data,comp_label,indexes = self.paths_to_data(self.all_data['file'].values.tolist(), one_hot_l)
         print(comp_data.shape[0])#58252
@@ -196,10 +216,18 @@ class create_dataset:
         return comp_data,comp_label
 
 class machine_construction:
-    def __init__(self,x_train,y_train):
-        self.x_train = min_max(x_train, axis=1)
-        self.y_train = y_train
-    
+    def __init__(self,x_train,y_train,acc_array):
+#        self.x_train = min_max(x_train, axis=1)
+        _len=int(x_train.shape[0]*0.8)
+        self.x_train = x_train[:_len,:,:]
+        self.y_train = y_train[:_len,:]
+        self.x_test  = x_train[_len:,:,:]
+        self.y_test  = y_train[_len:,:]
+        self.acc_array = acc_array
+        np.savetxt('./data_out/np_savetxt_x_ori.txt',self.x_train[:,:,1],fmt='%.3e')
+        np.savetxt('./data_out/np_savetxt_y_ori.txt',self.y_train[:,:],fmt='%.3e')
+        
+
     def call_Keras_LSTM_a(self):
         #最終的に(sample,nstep,ndim)
         model = Sequential()
@@ -207,10 +235,14 @@ class machine_construction:
         model.add(Dropout(0.2))
         model.add(Dense(128))
         model.add(Dropout(0.2))
-        model.add(Dense(12, activation = 'softmax'))
+        model.add(Dense(out_node, activation = 'softmax'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
+#        model.compile(optimizer = 'Adam', loss = 'categorical_crossentropy', metrics = ['accuracy'])
         model.summary()
-        model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
+        model.fit(self.x_train, self.y_train,
+                  batch_size = 256,
+                  epochs = epoch,
+                  validation_data=(self.x_test,self.y_test))
     
     def call_Keras_LSTM_b(self):
         #最終的に(sample,nstep,ndim)
@@ -219,45 +251,84 @@ class machine_construction:
         model.add(Dropout(0.2))
         model.add(Dense(128))
         model.add(Dropout(0.2))
-        model.add(Dense(12, activation = 'linear'))
+        model.add(Dense(out_node, activation = 'linear'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
         model.summary()
-        model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
+        model.fit(self.x_train, self.y_train,
+                batch_size = 1024,
+                epochs = epoch,
+                validation_data=(self.x_test,self.y_test))
 
     def call_Keras_LSTM_c(self):
         #最終的に(sample,nstep,ndim)
         model = Sequential()
         model.add(LSTM(128, input_shape = (nstep,ndim)))
-        model.add(Dense(12, activation = 'linear'))
+        model.add(Dense(out_node, activation = 'linear'))
         model.compile(optimizer = 'Adam', loss = 'mean_squared_error', metrics = ['accuracy'])
         model.summary()
-        model.fit(self.x_train, self.y_train, batch_size = 1024, epochs = epoch)
+        model.fit(self.x_train, self.y_train,
+                  batch_size = 1024,
+                  epochs = epoch,
+                  validation_data=(self.x_test,self.y_test))
     
     def call_fortran_poseidon(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_all_step):
         
+        y_tmp1 = self.y_train.reshape(self.y_train.shape[0],self.y_train.shape[1],1)
+        y_tmp2 = y_tmp1
+        for k in range(ndim-1):
+            y_tmp2 = np.concatenate([y_tmp2,y_tmp1],axis = -1)
+        data_tmp = np.concatenate([min_max(self.x_train, axis=1),y_tmp2],axis = 1)
+        data_tmp[np.isnan(data_tmp)] = 0.00000001
         
-        data_tmp = np.hstack((self.x_train.reshape(-1,nstep),self.y_train))
+        #np.savetxt('./data_out/np_savetxt_data_tmp.txt', data_tmp,fmt='%.3e')
+        #data_tmp[np.isnan(data_tmp)] = np.nanmean(data_tmp)
+        print(data_tmp)
         np.random.shuffle(data_tmp)
+        print(data_tmp)
+
         #b[1:3, 2:4] # 1~2行目、2~3列目を抜き出す
-        _traning_step = int(_all_step)
-        print(_traning_step)
-        _rc_step = int(_all_step*0.2)
-        x_tr = data_tmp[:_traning_step,0:ndim]
-        y_tr = data_tmp[:_traning_step,ndim:]
-        x_te = data_tmp[_traning_step:_rc_step,0:ndim]
-        y_te = data_tmp[_traning_step:_rc_step,ndim:]
+        #1元のみ
+        _traning_num =int(_samp_num*0.8)
+        _rc_num = int(_samp_num*0.2)
+        _traning_step = nstep* _traning_num
+        _rc_step = nstep* _rc_num
+        x_tr = data_tmp[:_traning_num,0:nstep,0:ndim]
+        y_tr = data_tmp[:_traning_num,nstep:,0]
+        x_te = data_tmp[_traning_num:_traning_num+_rc_num,0:nstep,0:ndim]
+        y_te = data_tmp[_traning_num:_traning_num+_rc_num,nstep:,0]
         
-        x_tr  =x_tr.reshape(-1,ndim).T.copy()
-        x_te  =x_te.reshape(-1,ndim).T.copy()
+        x_tr  =x_tr.reshape(-1,ndim)
+        x_te  =x_te.reshape(-1,ndim)
+        y_tr  =y_tr.reshape(-1,out_node)
+        y_te  =y_te.reshape(-1,out_node)
+#        np.savetxt('./data_out/np_savetxt_u.txt', x_tr,fmt='%.3e')
+#        np.savetxt('./data_out/np_savetxt_s.txt', y_tr,fmt='%.3e')
+        print('okuru data ====================x_tr')
+        print(x_tr)
+        print('okuru data ====================x_te')
+        print(x_te)
+        print('okuru data ====================y_tr')
+        print(y_tr)
+        print('okuru data ====================y_te')
+        print(y_te)
+        x_tr  =x_tr.T.copy().astype('float64')
+        x_te  =x_te.T.copy().astype('float64')
         y_tr  =y_tr.T.copy().astype('float64')
         y_te  =y_te.T.copy().astype('float64')
         Wout2 = Wout.T.copy().astype('float64')
-        print(x_tr)
-        print(x_te)
+        np.savetxt('./data_out/np_savetxt_u.txt', x_tr.T,fmt='%.3e')
+        np.savetxt('./data_out/np_savetxt_s.txt', y_tr.T,fmt='%.3e')
 
+
+        print(x_tr.shape)
+        print(y_tr.shape)
+        print(x_te.shape)
+        print(y_te.shape)
         
         f = np.ctypeslib.load_library("rc_poseidon.so", ".")
         f.rc_poseidon_.argtypes = [
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
@@ -277,37 +348,76 @@ class machine_construction:
         f_out_node = ctypes.byref(ctypes.c_int32(_out_node))
         f_rc_node = ctypes.byref(ctypes.c_int32(_rc_node))
         f_samp_num = ctypes.byref(ctypes.c_int32(_samp_num))
+        f_traning_num = ctypes.byref(ctypes.c_int32(_traning_num))
+        f_rc_num = ctypes.byref(ctypes.c_int32(_rc_num))
         f_samp_step = ctypes.byref(ctypes.c_int32(_samp_step))
         f_traning_step = ctypes.byref(ctypes.c_int32(_traning_step))
         f_rc_step = ctypes.byref(ctypes.c_int32(_rc_step))
     
 #        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
 #                        self.x_train,self.y_train,self.x_test,self.y_test,Wout)
-        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_samp_num,f_samp_step,f_traning_step,f_rc_step,
+        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,
+                    f_samp_num,f_traning_num,f_rc_num,f_samp_step,f_traning_step,f_rc_step,
                         x_tr,y_tr,x_te,y_te,Wout2)
         
     def call_fortran_tanh(self,_in_node,_out_node,_rc_node,_samp_num,_samp_step,_all_step):
         
         
-        data_tmp = np.hstack((self.x_train.reshape(-1,nstep),self.y_train))
-        np.random.shuffle(data_tmp)
+        y_tmp1 = self.y_train.reshape(self.y_train.shape[0],self.y_train.shape[1],1)
+        y_tmp2 = y_tmp1
+        for k in range(ndim-1):
+            y_tmp2 = np.concatenate([y_tmp2,y_tmp1],axis = -1)
+            print(y_tmp2.shape)
+        #data_tmp = np.concatenate([min_max(self.x_train, axis=1),y_tmp2],axis = 1)
+        data_tmp = np.concatenate([self.x_train,y_tmp2],axis = 1)
+        data_tmp[np.isnan(data_tmp)] = 0.00000001
+        
+        #np.savetxt('./data_out/np_savetxt_data_tmp.txt', data_tmp,fmt='%.3e')
+        #data_tmp[np.isnan(data_tmp)] = np.nanmean(data_tmp)
+        #np.random.shuffle(data_tmp)
+        print(data_tmp.shape)
+        print(data_tmp[0,:,1])#(sample,nstep,ndim)
 
         #b[1:3, 2:4] # 1~2行目、2~3列目を抜き出す
-        _traning_step = nstep* int(_samp_num*0.02)
-        _rc_step = nstep* int(_samp_num*0.01)
-        x_tr = data_tmp[:_traning_step,0:ndim]
-        y_tr = data_tmp[:_traning_step,ndim:]
-        x_te = data_tmp[_traning_step:_rc_step,0:ndim]
-        y_te = data_tmp[_traning_step:_rc_step,ndim:]
+        #1元のみ
+        _traning_num =int(_samp_num*0.8)
+        _rc_num = int(_samp_num*0.2)
+        _traning_step = nstep* _traning_num
+        _rc_step = nstep* _rc_num
+        x_tr = data_tmp[:_traning_num,0:nstep,0:ndim]
+        y_tr = data_tmp[:_traning_num,nstep:,0]
+        x_te = data_tmp[_traning_num:_traning_num+_rc_num,0:nstep,0:ndim]
+        y_te = data_tmp[_traning_num:_traning_num+_rc_num,nstep:,0]
         
-        x_tr  =x_tr.reshape(-1,ndim).T.copy()
-        x_te  =x_te.reshape(-1,ndim).T.copy()
+        x_tr  =x_tr.reshape(-1,ndim)
+        x_te  =x_te.reshape(-1,ndim)
+        y_tr  =y_tr.reshape(-1,out_node)
+        y_te  =y_te.reshape(-1,out_node)
+#        np.savetxt('./data_out/np_savetxt_u.txt', x_tr,fmt='%.3e')
+#        np.savetxt('./data_out/np_savetxt_s.txt', y_tr,fmt='%.3e')
+        print('okuru data ====================x_tr')
+        print(x_tr)
+        print('okuru data ====================x_te')
+        print(x_te)
+        print('okuru data ====================y_tr')
+        print(y_tr)
+        print('okuru data ====================y_te')
+        print(y_te)
+        x_tr  =x_tr.T.copy().astype('float64')
+        x_te  =x_te.T.copy().astype('float64')
         y_tr  =y_tr.T.copy().astype('float64')
         y_te  =y_te.T.copy().astype('float64')
         Wout2 = Wout.T.copy().astype('float64')
-        print(x_tr)
-        print(x_te)
-        np.savetxt('np_savetxt.txt', x_tr,fmt='%.3e')
+        acc_array = self.acc_array.T.copy().astype('float64')
+        np.savetxt('./data_out/np_savetxt_u.txt', x_tr.T,fmt='%.3e')
+        np.savetxt('./data_out/np_savetxt_s.txt', y_tr.T,fmt='%.3e')
+
+
+        print(x_tr.shape)
+        print(y_tr.shape)
+        print(x_te.shape)
+        print(y_te.shape)
+        
 
         
         f = np.ctypeslib.load_library("rc_tanh.so", ".")
@@ -319,6 +429,9 @@ class machine_construction:
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
             ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            ctypes.POINTER(ctypes.c_int32),
+            np.ctypeslib.ndpointer(dtype=np.float64),
             np.ctypeslib.ndpointer(dtype=np.float64),
             np.ctypeslib.ndpointer(dtype=np.float64),
             np.ctypeslib.ndpointer(dtype=np.float64),
@@ -331,32 +444,45 @@ class machine_construction:
         f_out_node = ctypes.byref(ctypes.c_int32(_out_node))
         f_rc_node = ctypes.byref(ctypes.c_int32(_rc_node))
         f_samp_num = ctypes.byref(ctypes.c_int32(_samp_num))
+        f_traning_num = ctypes.byref(ctypes.c_int32(_traning_num))
+        f_rc_num = ctypes.byref(ctypes.c_int32(_rc_num))
         f_samp_step = ctypes.byref(ctypes.c_int32(_samp_step))
         f_traning_step = ctypes.byref(ctypes.c_int32(_traning_step))
         f_rc_step = ctypes.byref(ctypes.c_int32(_rc_step))
     
 #        f.rc_poseidon_(f_in_node,f_out_node,f_rc_node,f_traning_step,f_rc_step,
 #                        self.x_train,self.y_train,self.x_test,self.y_test,Wout)
-        f.rc_tanh_(f_in_node,f_out_node,f_rc_node,f_samp_num,f_samp_step,f_traning_step,f_rc_step,
-                        x_tr,y_tr,x_te,y_te,Wout2)
-    
-    
+        f.rc_tanh_(f_in_node,f_out_node,f_rc_node,
+                    f_samp_num,f_traning_num,f_rc_num,f_samp_step,f_traning_step,f_rc_step,
+                        x_tr,y_tr,x_te,y_te,Wout2,acc_array)
+        df1 = pd.DataFrame(acc_array)
+        df2 = pd.DataFrame(Wout2)
+        print(df1)
+        #fig, ax = plt.subplots(figsize=(12, 9))
+        #sns.heatmap(df1, square=True, vmax=1, vmin=-1, center=0)
+        #plt.savefig('data_out/ac_array.png')
+        #fig2, ax = plt.subplots(figsize=(12, 9))
+        #sns.heatmap(df2, square=True, vmax=1, vmin=-1, center=0)
+        #plt.savefig('data_out/W_out.png')
+            
     def call_Keras_CNN(self):
         model = Sequential()
-        model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(28, 28, 1)))
+        model.add(Conv2D(32, kernel_size=(3, 3), activation='relu',input_shape = (nstep,ndim,1)))
         model.add(Conv2D(64, (3, 3), activation='relu'))
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Dropout(0.25))
         model.add(Flatten())
         model.add(Dense(128, activation='relu'))
         model.add(Dropout(0.5))
-        model.add(Dense(10, activation='softmax'))
+        model.add(Dense(out_node, activation='softmax'))
         model.compile(loss='categorical_crossentropy',
                       optimizer=RMSprop(),
                       metrics=['accuracy'])
+        self.x_train = self.x_train.reshape(self.x_train.shape + (1,))
+        self.x_test  = self.x_test .reshape(self.x_test .shape + (1,))
         history = model.fit(self.x_train, self.y_train,
                             batch_size=128,
-                            epochs=10,
+                            epochs=epoch,
                             verbose=1,
                             validation_data=(self.x_test, self.y_test))
     
@@ -372,15 +498,15 @@ if __name__ == '__main__':
     cd=create_dataset(all_train_data,PATH_train)
     data,one_hot_l = cd.main1()
     
-    mc=machine_construction(data, one_hot_l)
-#    mc.call_Keras_LSTM_a()
-#    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],data.shape[1],
-#                        int(data.shape[0]*data.shape[1]))
+    mc=machine_construction(data, one_hot_l,acc_array)
     print(data.shape)
-    mc.call_fortran_tanh(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
-                        int(data.shape[0]*nstep))
-#                     (in_node,_out_node,_rc_node,_samp_num,_samp_step,_traning_step,_rc_step):
-    
+#    mc.call_Keras_LSTM_a()
+    mc.call_Keras_CNN()
+#    mc.call_fortran_poseidon(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
+#                        int(data.shape[0]*nstep))
+#    mc.call_fortran_tanh(ndim,one_hot_l.shape[1],rc_node,data.shape[0],nstep,
+#                        int(data.shape[0]*nstep))
+#
     
     
     
